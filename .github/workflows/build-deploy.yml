@@ -43,6 +43,7 @@ jobs:
         run: |
           node kalo/patch-build.mjs vendor/cinny kalo
           node kalo/complete-build.mjs vendor/cinny
+          node kalo/vietnamese-ui.mjs vendor/cinny
 
       - name: Install dependencies
         working-directory: vendor/cinny
