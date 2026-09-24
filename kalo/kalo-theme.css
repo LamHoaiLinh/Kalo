@@ -6,10 +6,31 @@
   --kalo-mint-2:#dff3e8;
   --kalo-text:#173b2d;
 }
-html,body{background:#f4fbf7!important}
+html,body,#root{background:#f4fbf7!important}
 body{font-family:Inter,"Segoe UI",Arial,sans-serif}
 ::selection{background:#bfe9d1;color:#173b2d}
 a{accent-color:var(--kalo-green)}
 button,input,textarea{accent-color:var(--kalo-green)}
-body.kalo-embedded{overscroll-behavior:none}
+body.kalo-embedded{overscroll-behavior:none;height:100vh;overflow:hidden}
 body.kalo-embedded #root{min-height:100vh}
+
+/* Che tin nhắn: blur ngay trên thiết bị; rê chuột hoặc focus để xem tạm thời. */
+body.kalo-privacy [data-kalo-message="1"]{
+  filter:blur(7px);
+  opacity:.76;
+  transition:filter .14s ease,opacity .14s ease;
+  user-select:none;
+}
+body.kalo-privacy [data-kalo-message="1"]:hover,
+body.kalo-privacy [data-kalo-message="1"]:focus,
+body.kalo-privacy [data-kalo-message="1"]:focus-within{
+  filter:none;
+  opacity:1;
+  user-select:text;
+}
+
+/* Tăng cảm giác giống ứng dụng chat desktop quen thuộc. */
+body:not(.dark-theme){background:#edf8f2!important}
+@media(max-width:720px){
+  body.kalo-privacy [data-kalo-message="1"]:active{filter:none;opacity:1}
+}
