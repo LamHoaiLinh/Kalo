@@ -70,8 +70,7 @@ replaceAll('src/app/pages/auth/login/Login.tsx', [
         </>
       )}
 `, ''],
-  [`            {`This client does not support login on "${server}" homeserver. Password and SSO based login method not found.`}
-`, '            Hiện chưa thể đăng nhập. Vui lòng thử lại sau.\n'],
+  ['This client does not support login on "${server}" homeserver. Password and SSO based login method not found.', 'Hiện chưa thể đăng nhập. Vui lòng thử lại sau.'],
   [`      <Text align="Center">
         Do not have an account? <Link to={getRegisterPath(server)}>Register</Link>
       </Text>`,
