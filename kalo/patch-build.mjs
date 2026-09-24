@@ -26,7 +26,7 @@ const replaceAll = (rel, pairs) => {
 const append = (rel, content) => write(rel, `${read(rel).trimEnd()}\n\n${content.trim()}\n`);
 
 // GitHub Pages / Kalo base path.
-write('build.config.ts', `export default {\n  base: '/Kalo/',\n};\n`);
+write('build.config.ts', `export default {\n  base: './',\n};\n`);
 
 // Keep Matrix as the chat backend. matrix.org works immediately; custom homeservers remain available.
 write(
