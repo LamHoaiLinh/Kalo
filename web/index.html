@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#73c39a" />
+  <meta name="description" content="Kalo - trò chuyện riêng tư cho gia đình và nhóm nhỏ." />
+  <title>Kalo</title>
+  <link rel="icon" href="./icon.svg" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./styles.css?v=1.0.0" />
+</head>
+<body>
+  <main id="authScreen" class="auth-screen">
+    <section class="auth-card">
+      <div class="brand-large">
+        <img src="./icon.svg" alt="" />
+        <div>
+          <h1>Kalo</h1>
+          <p>Trò chuyện riêng tư cho gia đình và nhóm nhỏ</p>
+        </div>
+      </div>
+
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" data-auth-tab="login" type="button">Đăng nhập</button>
+        <button class="auth-tab" data-auth-tab="register" type="button">Tạo tài khoản</button>
+        <button class="auth-tab" data-auth-tab="forgot" type="button">Quên mật khẩu</button>
+      </div>
+
+      <form id="loginForm" class="auth-form" data-auth-panel="login">
+        <label>ID hoặc email<input id="loginId" autocomplete="username" required /></label>
+        <label>Mật khẩu<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+        <button class="primary-btn" type="submit">Đăng nhập</button>
+        <p class="form-note">Bạn có thể đăng nhập bằng ID Kalo. Email chỉ cần khi bạn đã đăng ký email khôi phục.</p>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden" data-auth-panel="register">
+        <label>Tên hiển thị<input id="registerName" maxlength="80" placeholder="Ví dụ: Linh" required /></label>
+        <label>ID Kalo<input id="registerId" maxlength="32" autocomplete="username" placeholder="linh" required /></label>
+        <div class="two-col">
+          <label>Mật khẩu<input id="registerPassword" type="password" minlength="8" autocomplete="new-password" required /></label>
+          <label>Nhập lại mật khẩu<input id="registerPassword2" type="password" minlength="8" autocomplete="new-password" required /></label>
+        </div>
+        <label>Email khôi phục <span class="optional">(không bắt buộc)</span>
+          <input id="registerEmail" type="email" autocomplete="email" placeholder="ban@gmail.com" />
+        </label>
+        <button class="primary-btn" type="submit">Tạo tài khoản</button>
+        <p class="form-note">Không nhập email vẫn dùng Kalo bình thường. Bạn sẽ nhận một mã khôi phục để tự giữ.</p>
+      </form>
+
+      <section id="forgotPanel" class="auth-form hidden" data-auth-panel="forgot">
+        <form id="codeResetForm" class="stack">
+          <h3>Tạo mật khẩu mới bằng mã khôi phục</h3>
+          <label>ID hoặc email<input id="resetId" required /></label>
+          <label>Mã khôi phục<input id="resetCode" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" required /></label>
+          <label>Mật khẩu mới<input id="resetPassword" type="password" minlength="8" required /></label>
+          <button class="primary-btn" type="submit">Tạo mật khẩu mới</button>
+        </form>
+        <div class="or"><span>hoặc</span></div>
+        <form id="emailResetForm" class="stack">
+          <h3>Khôi phục bằng email</h3>
+          <label>ID hoặc email<input id="emailResetId" required /></label>
+          <button class="secondary-btn" type="submit">Gửi email khôi phục</button>
+          <p class="form-note">Kalo chỉ gửi email khi bạn chủ động yêu cầu. Mỗi tài khoản được giới hạn một yêu cầu trong 10 phút.</p>
+        </form>
+      </section>
+
+      <div id="authMessage" class="auth-message" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <main id="appScreen" class="app-shell hidden">
+    <aside class="rail">
+      <button class="rail-logo" type="button" title="Kalo"><img src="./icon.svg" alt="Kalo" /></button>
+      <div class="rail-main">
+        <button class="rail-btn active" data-view="chats" type="button" title="Tin nhắn">💬<span>Tin</span></button>
+        <button class="rail-btn" data-view="people" type="button" title="Danh bạ">👥<span>Bạn</span></button>
+      </div>
+      <div class="rail-bottom">
+        <button id="privacyBtn" class="rail-btn" type="button" title="Che tin nhắn">🙈<span>Che</span></button>
+        <button id="settingsBtn" class="rail-btn" type="button" title="Cài đặt">⚙<span>Cài đặt</span></button>
+      </div>
+    </aside>
+
+    <section class="conversation-pane">
+      <header class="pane-header">
+        <div>
+          <h2 id="leftPaneTitle">Tin nhắn</h2>
+          <small id="onlineSummary">Đang kết nối...</small>
+        </div>
+        <button id="newChatBtn" class="round-btn" type="button" title="Cuộc trò chuyện mới">＋</button>
+      </header>
+      <div class="search-wrap"><input id="conversationSearch" placeholder="Tìm cuộc trò chuyện..." /></div>
+      <div id="conversationList" class="conversation-list"></div>
+      <div id="peopleList" class="conversation-list hidden"></div>
+    </section>
+
+    <section class="chat-pane">
+      <div id="emptyChat" class="empty-chat">
+        <img src="./icon.svg" alt="" />
+        <h2>Kalo</h2>
+        <p>Chọn một cuộc trò chuyện hoặc tạo cuộc trò chuyện mới.</p>
+      </div>
+
+      <div id="activeChat" class="active-chat hidden">
+        <header class="chat-header">
+          <div class="avatar" id="chatAvatar">K</div>
+          <div class="chat-title">
+            <strong id="chatTitle">Kalo</strong>
+            <small id="chatSubtitle">Riêng tư</small>
+          </div>
+          <div class="chat-actions">
+            <button id="chatInfoBtn" class="icon-btn" type="button" title="Thông tin">ⓘ</button>
+          </div>
+        </header>
+
+        <div id="messageList" class="message-list"></div>
+
+        <div id="fileProgress" class="file-progress hidden">
+          <div><strong id="fileProgressText">Đang truyền file...</strong><span id="fileProgressPct">0%</span></div>
+          <progress id="fileProgressBar" max="100" value="0"></progress>
+        </div>
+
+        <footer class="composer">
+          <input id="fileInput" type="file" hidden />
+          <button id="attachBtn" class="compose-icon" type="button" title="Gửi file trực tiếp">📎</button>
+          <textarea id="messageInput" rows="1" placeholder="Nhập tin nhắn..."></textarea>
+          <button id="sendBtn" class="send-btn" type="button">Gửi</button>
+        </footer>
+      </div>
+    </section>
+  </main>
+
+  <div id="newChatModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card modal-wide">
+      <header><div><h3>Cuộc trò chuyện mới</h3><p>Chọn một người hoặc nhiều người để tạo nhóm.</p></div><button data-close-modal="newChatModal">×</button></header>
+      <label class="modal-field">Tên nhóm <span class="optional">(chỉ cần khi chọn từ 2 người)</span>
+        <input id="groupNameInput" maxlength="80" placeholder="Ví dụ: Gia đình" />
+      </label>
+      <input id="peopleSearch" class="modal-search" placeholder="Tìm theo tên hoặc ID..." />
+      <div id="newChatPeople" class="people-picker"></div>
+      <footer><button data-close-modal="newChatModal" class="secondary-btn" type="button">Hủy</button><button id="createChatBtn" class="primary-btn" type="button">Tạo</button></footer>
+    </section>
+  </div>
+
+  <div id="identityModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card">
+      <header><div><h3>Mở khóa tin nhắn</h3><p id="identityHint">Nhập mã khôi phục Kalo để mở lịch sử riêng tư trên thiết bị này.</p></div></header>
+      <label class="modal-field">Mã khôi phục<input id="identityCode" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" /></label>
+      <div id="identityError" class="error-text"></div>
+      <footer><button id="identitySubmit" class="primary-btn" type="button">Tiếp tục</button></footer>
+    </section>
+  </div>
+
+  <div id="recoveryCodeModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card">
+      <header><div><h3>Lưu mã khôi phục</h3><p>Giữ mã này ở nơi an toàn. Mã giúp bạn tạo lại mật khẩu và mở lịch sử tin nhắn trên thiết bị mới.</p></div></header>
+      <div id="recoveryCodeValue" class="recovery-code"></div>
+      <button id="copyRecoveryCode" class="secondary-btn" type="button">Sao chép mã</button>
+      <footer><button id="recoveryCodeDone" class="primary-btn" type="button">Tôi đã lưu mã</button></footer>
+    </section>
+  </div>
+
+  <div id="settingsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card">
+      <header><div><h3>Cài đặt Kalo</h3><p id="settingsAccount"></p></div><button data-close-modal="settingsModal">×</button></header>
+      <label class="setting-row"><span><strong>Che tin nhắn</strong><small>Làm mờ nội dung, rê chuột vào để xem.</small></span><input id="privacyToggle" type="checkbox" /></label>
+      <form id="profileForm" class="stack setting-block">
+        <h4>Hồ sơ</h4>
+        <label>Tên hiển thị<input id="displayNameInput" maxlength="80" /></label>
+        <button class="secondary-btn" type="submit">Lưu tên</button>
+      </form>
+      <form id="changePasswordForm" class="stack setting-block">
+        <h4>Đổi mật khẩu</h4>
+        <label>Mật khẩu mới<input id="newPasswordInput" type="password" minlength="8" /></label>
+        <label>Nhập lại<input id="newPasswordInput2" type="password" minlength="8" /></label>
+        <button class="secondary-btn" type="submit">Đổi mật khẩu</button>
+      </form>
+      <div class="setting-block">
+        <h4>File lớn</h4>
+        <p class="form-note">File được truyền trực tiếp giữa hai máy. Người gửi và người nhận cần cùng online. Kalo không lưu nội dung file trên máy chủ.</p>
+      </div>
+      <footer><button id="logoutBtn" class="danger-btn" type="button">Đăng xuất</button></footer>
+    </section>
+  </div>
+
+  <div id="toastHost" class="toast-host" aria-live="polite"></div>
+
+  <script type="module" src="./app.js?v=1.0.0"></script>
+</body>
+</html>
