@@ -1,0 +1,96 @@
+name: Build and Deploy Kalo
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'kalo/**'
+      - 'README.md'
+      - 'NOTICE.md'
+      - '.github/workflows/build-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: kalo-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Kalo
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned Cinny 4.12.7
+        uses: actions/checkout@v4
+        with:
+          repository: cinnyapp/cinny
+          ref: 8967c13878137841e49ee17184b689a6b4da334a
+          path: vendor/cinny
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.13.1'
+          cache: npm
+          cache-dependency-path: vendor/cinny/package-lock.json
+
+      - name: Apply Kalo patches
+        run: |
+          node kalo/patch-build.mjs vendor/cinny kalo
+          node kalo/complete-build.mjs vendor/cinny
+
+      - name: Install dependencies
+        working-directory: vendor/cinny
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: vendor/cinny
+        run: npm run typecheck
+
+      - name: Build production app
+        working-directory: vendor/cinny
+        run: npm run build
+
+      - name: Smoke test built files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s vendor/cinny/dist/index.html
+          test -s vendor/cinny/dist/config.json
+          test -s vendor/cinny/dist/manifest.json
+          test -s vendor/cinny/dist/kalo/kalo.svg
+          test -s vendor/cinny/dist/kalo/kalo-theme.css
+          test -s vendor/cinny/dist/kalo/kalo-overlay.js
+          grep -q 'Kalo' vendor/cinny/dist/index.html
+          grep -q './manifest.json' vendor/cinny/dist/index.html
+          grep -q '/Kalo/' vendor/cinny/dist/index.html
+          grep -q 'matrix.org' vendor/cinny/dist/config.json
+          grep -q 'kalo-privacy' vendor/cinny/dist/kalo/kalo-theme.css
+          echo "Kalo production build smoke test passed."
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: vendor/cinny/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
