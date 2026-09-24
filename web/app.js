@@ -978,6 +978,9 @@ async function initAuth() {
   const { data } = await supabase.auth.getSession();
   if (data.session) {
     await startApp(data.session);
+    if (new URLSearchParams(location.search).get('recovery') === '1') {
+      setTimeout(showEmailPasswordRecoveryDialog, 80);
+    }
   }
 }
 
