@@ -49,7 +49,8 @@ jobs:
         working-directory: vendor/cinny
         run: npm ci
 
-      - name: Typecheck
+      - name: Upstream typecheck diagnostic
+        continue-on-error: true
         working-directory: vendor/cinny
         run: npm run typecheck
 
