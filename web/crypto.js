@@ -35,11 +35,11 @@ async function idbPut(key, value) {
   });
 }
 
-export async function clearLocalIdentity() {
+export async function clearLocalIdentity(userId) {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).delete('identity');
+    tx.objectStore(STORE).delete(`identity:${userId}`);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -106,16 +106,16 @@ async function deriveBackupKey(secret, salt, iterations = 250000) {
   );
 }
 
-async function saveLocalIdentity(record) {
-  await idbPut('identity', {
+async function saveLocalIdentity(userId, record) {
+  await idbPut(`identity:${userId}`, {
     publicJwk: record.publicJwk,
     privateJwk: record.privateJwk,
     savedAt: Date.now(),
   });
 }
 
-export async function loadLocalIdentity() {
-  const record = await idbGet('identity');
+export async function loadLocalIdentity(userId) {
+  const record = await idbGet(`identity:${userId}`);
   if (!record?.publicJwk || !record?.privateJwk) return null;
   try {
     return await importIdentity(record);
@@ -173,7 +173,7 @@ export async function generateIdentity(supabase, userId, recoveryCode) {
   );
   const exported = await exportIdentity(keyPair);
   const identity = { ...keyPair, ...exported };
-  await saveLocalIdentity(identity);
+  await saveLocalIdentity(userId, identity);
   await backupIdentity(supabase, userId, identity, recoveryCode);
   return identity;
 }
@@ -200,7 +200,7 @@ export async function restoreIdentity(supabase, userId, recoveryCode) {
     const privateJwk = JSON.parse(decoder.decode(clear));
     const publicJwk = JSON.parse(data.public_key);
     const identity = await importIdentity({ privateJwk, publicJwk });
-    await saveLocalIdentity(identity);
+    await saveLocalIdentity(userId, identity);
 
     const { error: profileError } = await supabase
       .from('kalo_profiles')
@@ -214,7 +214,7 @@ export async function restoreIdentity(supabase, userId, recoveryCode) {
 }
 
 export async function ensureIdentity(supabase, userId) {
-  const local = await loadLocalIdentity();
+  const local = await loadLocalIdentity(userId);
   if (local) {
     const publicKey = JSON.stringify(local.publicJwk);
     await supabase
