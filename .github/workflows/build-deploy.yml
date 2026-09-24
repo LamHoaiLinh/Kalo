@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'web/**'
+      - 'tests/**'
       - 'README.md'
       - '.github/workflows/build-deploy.yml'
   workflow_dispatch:
@@ -56,6 +57,9 @@ jobs:
             exit 1
           fi
           echo "Kalo native static checks passed."
+
+      - name: E2EE roundtrip smoke test
+        run: node tests/crypto-smoke.mjs
 
       - name: Auth API smoke check
         shell: bash
