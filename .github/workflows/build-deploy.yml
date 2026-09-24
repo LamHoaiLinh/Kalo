@@ -24,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Kalo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout pinned Cinny 4.12.7
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: cinnyapp/cinny
           ref: 8967c13878137841e49ee17184b689a6b4da334a
@@ -92,4 +92,4 @@ jobs:
     steps:
       - name: Deploy GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
