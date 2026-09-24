@@ -6,16 +6,22 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const write = (rel, content) => fs.writeFileSync(path.join(root, rel), content, 'utf8');
 const replace = (rel, from, to) => {
   const src = read(rel);
+  if (src.includes(from)) {
+    write(rel, src.replace(from, to));
+    return;
+  }
   if (src.includes(to)) return;
-  if (!src.includes(from)) throw new Error(`Vietnamese patch failed: ${rel} missing ${from.slice(0, 100)}`);
-  write(rel, src.replace(from, to));
+  throw new Error(`Vietnamese patch failed: ${rel} missing ${from.slice(0, 100)}`);
 };
 const replaceAll = (rel, pairs) => {
   let src = read(rel);
   for (const [from, to] of pairs) {
+    if (src.includes(from)) {
+      src = src.split(from).join(to);
+      continue;
+    }
     if (src.includes(to)) continue;
-    if (!src.includes(from)) throw new Error(`Vietnamese patch failed: ${rel} missing ${from.slice(0, 100)}`);
-    src = src.split(from).join(to);
+    throw new Error(`Vietnamese patch failed: ${rel} missing ${from.slice(0, 100)}`);
   }
   write(rel, src);
 };
