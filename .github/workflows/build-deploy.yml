@@ -68,7 +68,7 @@ jobs:
           test -s vendor/cinny/dist/kalo/kalo-overlay.js
           grep -q 'Kalo' vendor/cinny/dist/index.html
           grep -q './manifest.json' vendor/cinny/dist/index.html
-          grep -q '/Kalo/' vendor/cinny/dist/index.html
+          grep -q './assets/' vendor/cinny/dist/index.html
           grep -q 'matrix.org' vendor/cinny/dist/config.json
           grep -q 'kalo-privacy' vendor/cinny/dist/kalo/kalo-theme.css
           echo "Kalo production build smoke test passed."
