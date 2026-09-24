@@ -1,0 +1,15 @@
+:root{
+  color-scheme:light;
+  --kalo-green:#4ea97c;
+  --kalo-green-2:#7fc9a5;
+  --kalo-mint:#eaf7f0;
+  --kalo-mint-2:#dff3e8;
+  --kalo-text:#173b2d;
+}
+html,body{background:#f4fbf7!important}
+body{font-family:Inter,"Segoe UI",Arial,sans-serif}
+::selection{background:#bfe9d1;color:#173b2d}
+a{accent-color:var(--kalo-green)}
+button,input,textarea{accent-color:var(--kalo-green)}
+body.kalo-embedded{overscroll-behavior:none}
+body.kalo-embedded #root{min-height:100vh}
