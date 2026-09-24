@@ -1,13 +1,11 @@
-name: Build and Publish Kalo
+name: Test and Publish Kalo Native
 
 on:
   push:
     branches: [ main ]
     paths:
-      - 'kalo/**'
-      - 'backend/**'
+      - 'web/**'
       - 'README.md'
-      - 'NOTICE.md'
       - '.github/workflows/build-deploy.yml'
   workflow_dispatch:
 
@@ -15,7 +13,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: kalo-build
+  group: kalo-native-build
   cancel-in-progress: true
 
 jobs:
@@ -25,69 +23,54 @@ jobs:
       - name: Checkout Kalo
         uses: actions/checkout@v5
 
-      - name: Checkout pinned Cinny 4.12.7
-        uses: actions/checkout@v5
-        with:
-          repository: cinnyapp/cinny
-          ref: 8967c13878137841e49ee17184b689a6b4da334a
-          path: vendor/cinny
-
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
           node-version: '24.13.1'
-          cache: npm
-          cache-dependency-path: vendor/cinny/package-lock.json
 
-      - name: Apply Kalo patches
+      - name: Syntax checks
         run: |
-          node kalo/patch-build.mjs vendor/cinny kalo
-          node kalo/complete-build.mjs vendor/cinny
-          node kalo/vietnamese-ui.mjs vendor/cinny
+          node --check web/config.js
+          node --check web/crypto.js
+          node --check web/webrtc.js
+          node --check web/app.js
+          node --check web/sw.js
 
-      - name: Install dependencies
-        working-directory: vendor/cinny
-        run: npm ci
-
-      - name: Upstream typecheck diagnostic
-        continue-on-error: true
-        working-directory: vendor/cinny
-        run: npm run typecheck
-
-      - name: Build production app
-        working-directory: vendor/cinny
-        run: npm run build
-
-      - name: Smoke test built files
+      - name: Static smoke checks
         shell: bash
         run: |
           set -euo pipefail
-          test -s vendor/cinny/dist/index.html
-          test -s vendor/cinny/dist/config.json
-          test -s vendor/cinny/dist/manifest.json
-          test -s vendor/cinny/dist/kalo/kalo.svg
-          test -s vendor/cinny/dist/kalo/kalo-theme.css
-          test -s vendor/cinny/dist/kalo/kalo-overlay.js
-          grep -q 'Kalo' vendor/cinny/dist/index.html
-          grep -q './manifest.json' vendor/cinny/dist/index.html
-          grep -q './assets/' vendor/cinny/dist/index.html
-          grep -q 'matrix.org' vendor/cinny/dist/config.json
-          grep -q 'kalo-privacy' vendor/cinny/dist/kalo/kalo-theme.css
-          echo "Kalo production build smoke test passed."
+          test -s web/index.html
+          test -s web/styles.css
+          test -s web/app.js
+          test -s web/crypto.js
+          test -s web/webrtc.js
+          grep -q 'Kalo' web/index.html
+          grep -q 'Tạo tài khoản' web/index.html
+          grep -q 'Quên mật khẩu' web/index.html
+          grep -q 'kalo-auth' web/config.js
+          grep -q 'kalo_messages' web/app.js
+          grep -q 'RTCPeerConnection' web/webrtc.js
+          if grep -RniE 'matrix\.org|Homeserver|Continue with SSO|Powered by Matrix' web; then
+            echo "Matrix-facing text must not exist in native Kalo web."
+            exit 1
+          fi
+          echo "Kalo native static checks passed."
 
-      - name: Publish verified build to gh-pages
+      - name: Publish verified site to gh-pages
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          cd vendor/cinny/dist
+          cp -a web /tmp/kalo-site
+          cd /tmp/kalo-site
           touch .nojekyll
           git init
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B gh-pages
           git add -A
-          git commit -m "Deploy Kalo ${GITHUB_SHA}"
+          git commit -m "Deploy Kalo Native ${GITHUB_SHA}"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin gh-pages
