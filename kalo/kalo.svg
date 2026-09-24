@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Kalo">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#a9e6c5"/><stop offset="1" stop-color="#62b98c"/></linearGradient></defs>
+  <rect width="128" height="128" rx="32" fill="url(#g)"/>
+  <path d="M31 35h16v22l23-22h21L62 62l31 31H71L47 68v25H31z" fill="#fff"/>
+  <circle cx="98" cy="31" r="8" fill="#eafff2" opacity=".9"/>
+</svg>
