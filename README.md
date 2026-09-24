@@ -1,43 +1,62 @@
 # Kalo
 
-Kalo là ứng dụng trò chuyện web/PWA theo phong cách thao tác quen thuộc của ứng dụng nhắn tin Việt Nam, dùng **Matrix** làm giao thức và kế thừa lõi mã nguồn mở **Cinny 4.12.7** để có sẵn E2EE, gửi ảnh/tập tin, reaction, reply, typing, read receipt, multi-device và lưu cache cục bộ.
+Kalo là ứng dụng trò chuyện web/PWA dành cho **gia đình, đồng nghiệp và nhóm nhỏ**, dùng tài khoản riêng của Kalo và được nhúng trực tiếp trong Kanban.
 
-## Trạng thái
+## Trạng thái hiện tại
 
-- Frontend Kalo: GitHub Pages tại `https://lamhoailinh.github.io/Kalo/`
-- Nền mã nguồn: Cinny commit `8967c13878137841e49ee17184b689a6b4da334a` (v4.12.7)
-- Backend mặc định: Matrix homeserver `matrix.org`
-- Có thể đổi sang Synapse riêng sau này mà không phải viết lại Kalo.
-- Không dùng Supabase cho lõi chat/E2EE.
+- Web: `https://lamhoailinh.github.io/Kalo/`
+- Frontend: HTML/CSS/JavaScript thuần trong thư mục `web/`.
+- Tài khoản, đồng bộ và dữ liệu chat: project Supabase `family-farm-online`, dùng các bảng có tiền tố `kalo_`.
+- Không phụ thuộc Matrix/Cinny.
+- Không dùng Supabase Storage để truyền file lớn.
 
-## Điểm riêng của Kalo
+## Chức năng
 
-- Tông xanh lá pastel.
-- Mở mặc định ở **Tin nhắn**, bố cục ba vùng gần với ứng dụng nhắn tin desktop.
-- Tin nhắn dạng bubble; tin của bạn nằm bên phải và có nền xanh pastel.
-- Chat 1-1 mặc định bật mã hóa đầu cuối theo cơ chế Matrix/Cinny.
-- Gửi hình, file, audio/video, reaction, reply, chỉnh sửa/xóa theo quyền Matrix.
-- Cài đặt **Che tin nhắn**: làm mờ nội dung và hình ảnh, rê chuột/focus để xem tạm thời.
-- Dữ liệu phiên/sync được lưu cục bộ bằng IndexedDB theo lõi Cinny.
-- Khi nhúng trong Kanban: **Alt+K** mở Kalo; **Esc** trở về Kanban.
-- Xưng hô trong phần tùy biến Kalo là **bạn**.
+- Đăng ký bằng **ID + mật khẩu + nhập lại mật khẩu**.
+- Email khôi phục là tùy chọn, không bắt buộc.
+- Không gửi email thông báo chat.
+- Email khôi phục chỉ được gửi khi người dùng chủ động yêu cầu và được giới hạn tối đa 1 yêu cầu / 10 phút.
+- Mỗi tài khoản có **mã khôi phục Kalo** để tạo lại mật khẩu mà không cần email.
+- Chat 1-1 và nhóm.
+- Tin nhắn được mã hóa ở trình duyệt trước khi lưu lên server.
+- Thả tim tin nhắn.
+- Trạng thái online.
+- Chế độ **Che tin nhắn**.
+- File lớn truyền **trực tiếp máy gửi → máy nhận bằng WebRTC**; nội dung file không lưu trong Supabase.
+- Người gửi và người nhận phải cùng online để truyền file.
+- Với Chrome/Edge trên máy tính, file nhận có thể được ghi thẳng xuống ổ đĩa thay vì giữ toàn bộ trong RAM.
+- `Alt+K` mở Kalo trong Kanban; `Esc` quay về Kanban.
 
-## Cách build
+## Cấu trúc
 
-Repo này không chép lại gần 1.000 file Cinny. Workflow tải đúng commit Cinny đã khóa, áp các patch Kalo trong thư mục `kalo/`, build bằng Vite rồi deploy GitHub Pages. Cách này giúp repo nhẹ nhưng vẫn có thể tái tạo đúng mã nguồn dẫn xuất.
+- `web/index.html` — giao diện.
+- `web/styles.css` — giao diện xanh lá pastel.
+- `web/app.js` — tài khoản, chat, nhóm, reaction, realtime.
+- `web/crypto.js` — mã hóa/giải mã phía người dùng và khóa bảo mật.
+- `web/webrtc.js` — truyền file P2P.
+- `web/config.js` — cấu hình frontend.
+- `.github/workflows/build-deploy.yml` — kiểm tra cú pháp/smoke test và deploy GitHub Pages.
 
-```bash
-# Workflow tự làm các bước này:
-# 1) tải Cinny commit đã khóa
-# 2) node kalo/patch-build.mjs vendor/cinny kalo
-# 3) npm ci
-# 4) npm run build
-```
+## Backend Kalo trong Supabase
 
-## Backend
+Các bảng Kalo được tách bằng tiền tố `kalo_` để không đụng dữ liệu game Family Farm:
 
-Kalo hoạt động ngay với Matrix homeserver có sẵn. Nếu muốn dữ liệu nằm trên hạ tầng riêng, xem `backend/README.md` để triển khai Synapse + PostgreSQL trên VPS/server.
+- `kalo_profiles`
+- `kalo_private_accounts`
+- `kalo_key_backups`
+- `kalo_conversations`
+- `kalo_conversation_members`
+- `kalo_messages`
+- `kalo_reactions`
+- `kalo_reads`
+- `kalo_webrtc_signals`
+
+Edge Function `kalo-auth` xử lý đăng ký, đăng nhập và khôi phục mật khẩu.
+
+## Lưu ý file lớn
+
+Kalo không upload file chat vào Supabase Storage. Supabase chỉ chuyển tín hiệu kết nối rất nhỏ. Nếu mạng công ty/NAT chặn WebRTC trực tiếp, Kalo sẽ báo không kết nối được thay vì tự upload file lên server.
 
 ## Giấy phép
 
-Kalo là tác phẩm dẫn xuất từ Cinny và tiếp tục sử dụng **AGPL-3.0-only**. Xem `LICENSE` và `NOTICE.md`.
+Kalo hiện được phát hành theo giấy phép AGPL-3.0 trong file `LICENSE`.
