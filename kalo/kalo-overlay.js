@@ -5,7 +5,7 @@
 
   const notifyParent=(type,payload={})=>{
     if(!embedded) return;
-    try{window.parent.postMessage({source:'kalo',type,...payload},window.location.origin)}catch(_){/* no-op */}
+    try{window.parent.postMessage({source:'kalo',type,...payload},'*')}catch(_){/* no-op */}
   };
 
   window.addEventListener('keydown',(event)=>{
