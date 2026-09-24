@@ -57,6 +57,17 @@ jobs:
           fi
           echo "Kalo native static checks passed."
 
+      - name: Auth API smoke check
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl -sS -X POST 'https://qjpcxhackvoewcxlatis.supabase.co/functions/v1/kalo-auth' \
+            -H 'Content-Type: application/json' \
+            -H 'apikey: sb_publishable_TArSkv7lbokFpK9KZxp5Iw_iJ7f29wh' \
+            --data '{"action":"login","identifier":"__kalo_smoke__","password":"invalid-password"}')"
+          echo "$body" | grep -q 'ID hoặc mật khẩu không đúng'
+          echo "Kalo auth endpoint smoke check passed."
+
       - name: Publish verified site to gh-pages
         shell: bash
         env:
