@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v16-own-rail-avatar';
+const CACHE='kalo-native-v17-avatar-viewer';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.6.3',
-  './app.js?v=1.6.3',
+  './styles.css?v=1.6.4',
+  './app.js?v=1.6.4',
   './config.js',
   './crypto.js',
   './webrtc.js',
