@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.3.0" />
+  <link rel="stylesheet" href="./styles.css?v=1.4.0" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -144,11 +144,29 @@
             <small id="chatSubtitle">Riêng tư</small>
           </div>
           <div class="chat-actions">
+            <button id="messageSearchBtn" class="icon-btn" type="button" title="Tìm trong cuộc trò chuyện" aria-label="Tìm trong cuộc trò chuyện">🔍</button>
             <button id="audioCallBtn" class="icon-btn" type="button" title="Gọi thoại">📞</button>
             <button id="videoCallBtn" class="icon-btn" type="button" title="Gọi video">🎥</button>
             <button id="chatInfoBtn" class="icon-btn" type="button" title="Thông tin">ⓘ</button>
           </div>
         </header>
+
+        <section id="messageSearchPanel" class="message-search-panel hidden" aria-label="Tìm tin nhắn">
+          <div class="message-search-controls">
+            <label class="message-search-text">
+              <span>🔍</span>
+              <input id="messageSearchText" type="search" placeholder="Tìm chữ, tên file..." autocomplete="off" />
+            </label>
+            <label class="message-search-date">
+              <span>Ngày</span>
+              <input id="messageSearchDate" type="date" />
+            </label>
+            <button id="messageSearchClear" class="secondary-btn compact-btn" type="button">Xóa lọc</button>
+            <button id="messageSearchClose" class="icon-btn" type="button" title="Đóng tìm kiếm">×</button>
+          </div>
+          <div id="messageSearchSummary" class="message-search-summary">Nhập từ khóa hoặc chọn ngày.</div>
+          <div id="messageSearchResults" class="message-search-results"></div>
+        </section>
 
         <div id="messageList" class="message-list"></div>
 
@@ -333,6 +351,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.3.0"></script>
+  <script type="module" src="./app.js?v=1.4.0"></script>
 </body>
 </html>
