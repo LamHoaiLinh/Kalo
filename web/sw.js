@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v12-fixed-composer-privacy-shortcut';
+const CACHE='kalo-native-v13-avatars-nicknames';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.5.3',
-  './app.js?v=1.5.3',
+  './styles.css?v=1.6.0',
+  './app.js?v=1.6.0',
   './config.js',
   './crypto.js',
   './webrtc.js',
