@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v15-crop-priority-scroll-latest';
+const CACHE='kalo-native-v16-own-rail-avatar';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.6.2',
-  './app.js?v=1.6.2',
+  './styles.css?v=1.6.3',
+  './app.js?v=1.6.3',
   './config.js',
   './crypto.js',
   './webrtc.js',
