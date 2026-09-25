@@ -352,6 +352,23 @@ function setAvatarElement(element, profile, fallbackLabel) {
   }
 }
 
+function updateSelfAvatar() {
+  const root = $('#selfAvatar');
+  if (!root) return;
+  const url = safeAvatarUrl(state.profile?.avatar_url);
+  if (url) {
+    root.innerHTML = `<img class="avatar-image" src="${escapeHtml(url)}" alt="Ảnh đại diện của tôi" />`;
+    root.classList.add('has-image');
+  } else {
+    root.innerHTML = '<img src="./icon.svg" alt="Kalo" />';
+    root.classList.remove('has-image');
+  }
+  const button = $('#selfAvatarBtn');
+  if (button) button.title = state.profile?.display_name
+    ? `${state.profile.display_name} · Tài khoản của tôi`
+    : 'Tài khoản của tôi';
+}
+
 function updateProfileAvatarPreview() {
   const preview = $('#profileAvatarPreview');
   if (!preview) return;
@@ -504,6 +521,7 @@ async function saveOwnAvatar(avatarUrl) {
   await loadProfiles();
   state.profile = state.profiles.get(state.user.id) || state.profile;
   updateProfileAvatarPreview();
+  updateSelfAvatar();
   renderPeopleList();
   renderConversationList();
   renderChatHeader();
@@ -1326,6 +1344,15 @@ async function startRealtime() {
       renderPeopleList();
       renderConversationList();
       renderOnlineSummary();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_profiles' }, async () => {
+      await loadProfiles();
+      updateSelfAvatar();
+      updateProfileAvatarPreview();
+      renderPeopleList();
+      renderConversationList();
+      renderChatHeader();
+      renderMessages();
     })
     .subscribe();
   state.realtimeChannels.push(dataChannel);
@@ -2468,6 +2495,7 @@ async function startApp(session) {
     $('#settingsAccount').textContent = `@${state.profile.username}`;
     $('#displayNameInput').value = state.profile.display_name;
     updateProfileAvatarPreview();
+    updateSelfAvatar();
     applyPrivacy(localStorage.getItem('kalo-privacy') === '1');
     setView('chats');
     renderOnlineSummary();
@@ -2888,6 +2916,8 @@ function bindAppEvents() {
   $('#privacyBtn').addEventListener('click', () => applyPrivacy(!document.body.classList.contains('privacy-mode')));
   $('#privacyToggle').addEventListener('change', (event) => applyPrivacy(event.target.checked));
 
+  $('#selfAvatarBtn').addEventListener('click', () => $('#settingsBtn').click());
+
   $('#settingsBtn').addEventListener('click', () => {
     $('#settingsAccount').textContent = `@${state.profile?.username || ''}`;
     $('#displayNameInput').value = state.profile?.display_name || '';
@@ -3022,6 +3052,7 @@ function bindAppEvents() {
     await loadProfiles();
     state.profile = state.profiles.get(state.user.id) || state.profile;
     updateProfileAvatarPreview();
+    updateSelfAvatar();
     renderPeopleList();
     renderConversationList();
     renderChatHeader();
