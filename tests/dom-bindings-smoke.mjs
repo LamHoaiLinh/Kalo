@@ -26,6 +26,18 @@ const requiredIds = [
   'friendIdInput',
   'myQrCode',
   'groupFriendsPicker',
+  'documentsList',
+  'documentsHome',
+  'addDocumentBtn',
+  'documentsStorageLabel',
+  'settingsStorageLabel',
+  'changeStorageBtn',
+  'audioCallBtn',
+  'videoCallBtn',
+  'incomingCallModal',
+  'callModal',
+  'remoteCallVideo',
+  'localCallVideo',
 ];
 
 for (const id of requiredIds) {
@@ -35,5 +47,8 @@ for (const id of requiredIds) {
 if (!app.includes("storage: authStorage")) throw new Error('Remember-login storage adapter is missing');
 if (!app.includes("new QrScanner(")) throw new Error('QR scanner binding is missing');
 if (!app.includes("from('kalo_friendships')")) throw new Error('Friendship backend binding is missing');
+if (!app.includes("new KaloDocuments(")) throw new Error('My Documents manager is missing');
+if (!app.includes("new KaloCallManager(")) throw new Error('Call manager is missing');
+if (!app.includes("createReceiveTarget:")) throw new Error('Received files are not routed to My Documents');
 
 console.log('Kalo DOM binding smoke test passed.');
