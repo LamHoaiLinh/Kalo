@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v9-conversation-categories-icons';
+const CACHE='kalo-native-v10-quick-actions';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.5.0',
-  './app.js?v=1.5.0',
+  './styles.css?v=1.5.1',
+  './app.js?v=1.5.1',
   './config.js',
   './crypto.js',
   './webrtc.js',
