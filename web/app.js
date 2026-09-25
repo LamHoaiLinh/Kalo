@@ -14,11 +14,34 @@ import {
 import { KaloFileTransfer } from './webrtc.js';
 import QrScanner from './vendor/qr-scanner.min.js';
 
+const REMEMBER_LOGIN_KEY = 'kalo-remember-login';
+const rememberLoginEnabled = () => localStorage.getItem(REMEMBER_LOGIN_KEY) !== '0';
+
+const authStorage = {
+  getItem(key) {
+    return localStorage.getItem(key) ?? sessionStorage.getItem(key);
+  },
+  setItem(key, value) {
+    if (rememberLoginEnabled()) {
+      localStorage.setItem(key, value);
+      sessionStorage.removeItem(key);
+    } else {
+      sessionStorage.setItem(key, value);
+      localStorage.removeItem(key);
+    }
+  },
+  removeItem(key) {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  },
+};
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    storage: authStorage,
   },
 });
 
@@ -107,6 +130,23 @@ function setBusy(button, busy, text = 'Đang xử lý...') {
     button.disabled = false;
   }
 }
+
+function applyRememberLoginPreference() {
+  const checkbox = $('#rememberLogin');
+  const enabled = checkbox ? checkbox.checked : true;
+  localStorage.setItem(REMEMBER_LOGIN_KEY, enabled ? '1' : '0');
+  return enabled;
+}
+
+function initRememberLoginPreference() {
+  const checkbox = $('#rememberLogin');
+  if (!checkbox) return;
+  checkbox.checked = rememberLoginEnabled();
+  checkbox.addEventListener('change', () => {
+    localStorage.setItem(REMEMBER_LOGIN_KEY, checkbox.checked ? '1' : '0');
+  });
+}
+
 
 async function invokeAuth(action, payload = {}) {
   const response = await fetch(AUTH_FUNCTION_URL, {
@@ -1176,7 +1216,8 @@ function showEmailPasswordRecoveryDialog() {
 }
 
 async function initAuth() {
-  $$('.auth-tab').forEach((btn) => btn.addEventListener('click', () => switchAuthTab(btn.dataset.authTab)));
+  initRememberLoginPreference();
+  $('.auth-tab').forEach((btn) => btn.addEventListener('click', () => switchAuthTab(btn.dataset.authTab)));
 
   $('#loginForm').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1184,6 +1225,7 @@ async function initAuth() {
     setBusy(button, true);
     setAuthMessage('');
     try {
+      applyRememberLoginPreference();
       const data = await invokeAuth('login', {
         identifier: $('#loginId').value,
         password: $('#loginPassword').value,
@@ -1209,6 +1251,7 @@ async function initAuth() {
     setBusy(button, true);
     setAuthMessage('');
     try {
+      applyRememberLoginPreference();
       const data = await invokeAuth('register', {
         username: $('#registerId').value,
         displayName: $('#registerName').value,
