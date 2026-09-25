@@ -984,3 +984,107 @@ body{overflow:hidden}
   .chat-pane{min-height:0;overflow:hidden}
   .active-chat{height:100%;min-height:0;overflow:hidden}
 }
+
+
+/* v1.6 - Account avatars + private contact nicknames */
+.avatar,
+.msg-avatar,
+.profile-avatar-preview{
+  overflow:hidden;
+}
+.avatar-image{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.avatar.has-image,
+.msg-avatar.has-image,
+.profile-avatar-preview.has-image{
+  background:#eaf4ef;
+  color:transparent;
+}
+.chat-title{flex:1;min-width:0}
+.chat-title-line{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+.chat-title-line strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.rename-contact-btn{
+  flex:0 0 auto;
+  width:25px;
+  height:25px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid transparent;
+  border-radius:8px;
+  background:transparent;
+  color:#668178;
+  cursor:pointer;
+  font-size:13px;
+  transition:background .14s ease,border-color .14s ease,transform .14s ease;
+}
+.rename-contact-btn:hover{
+  background:#e9f6ef;
+  border-color:#b9dbc8;
+  color:#2f7552;
+  transform:scale(1.06);
+}
+.profile-avatar-editor{
+  display:grid;
+  grid-template-columns:74px minmax(0,1fr);
+  gap:14px;
+  align-items:center;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#f8fcfa;
+}
+.profile-avatar-preview{
+  width:72px;
+  height:72px;
+  border-radius:22px;
+  display:grid;
+  place-items:center;
+  background:linear-gradient(145deg,#b2e4ca,#78c39e);
+  color:#fff;
+  font-size:23px;
+  font-weight:900;
+  box-shadow:0 5px 15px rgba(50,119,82,.12);
+}
+.profile-avatar-actions{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+.profile-avatar-actions strong{font-size:13px}
+.profile-avatar-actions small{font-size:11px;color:var(--muted);line-height:1.4}
+.profile-avatar-actions>div{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  margin-top:3px;
+}
+.alias-modal-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+}
+.msg-avatar{
+  overflow:hidden;
+}
+@media(max-width:560px){
+  .profile-avatar-editor{grid-template-columns:62px minmax(0,1fr);gap:10px;padding:10px}
+  .profile-avatar-preview{width:60px;height:60px;border-radius:18px}
+  .alias-modal-actions{flex-direction:column-reverse;align-items:stretch}
+}
