@@ -15,6 +15,12 @@ for (const pattern of badPatterns) {
   if (pattern.test(app)) throw new Error(`Single-element selector used as a list: ${pattern}`);
 }
 
+for (const line of app.split('\n')) {
+  if (/[^$]\$\([^)]*\)\.forEach/.test(` ${line}`)) {
+    throw new Error(`Single-element selector used as a list: ${line.trim()}`);
+  }
+}
+
 const requiredIds = [
   'rememberLogin',
   'addFriendBtn',
