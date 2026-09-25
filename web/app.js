@@ -87,7 +87,7 @@ const state = {
 
 const STICKERS = [
   '😀','😄','😂','🤣','😊','😍','🥰','😘',
-  '😎','🤩','🥳','😇','🤗','🤭','🫡','🤔',
+  '😎','🤩','🥳','😇','🤗','🤭','😋','🤔',
   '😴','🥺','😭','😤','😡','😱','🤯','🤦',
   '👍','👏','🙏','💪','❤️','💚','🔥','🎉',
   '🌷','🌻','🍀','☕','🎂','🎁','🚗','🏃'
@@ -1189,7 +1189,7 @@ function renderMessages() {
         </div>
         <div class="msg-actions">
           ${m.localDocument
-            ? `<button class="mini-action" data-my-doc-remove="${m.id}" type="button" title="Xóa khỏi My Documents">🗑</button>`
+            ? `<button class="my-doc-delete-btn" data-my-doc-remove="${m.id}" type="button" title="Xóa khỏi My Documents">🗑 Xóa khỏi My Documents</button>`
             : `<button class="mini-action" data-heart="${m.id}" type="button">${mine ? '❤️' : '♡'} ${hearts.length || ''}</button>`}
         </div>
       </div>
@@ -2356,6 +2356,17 @@ function bindAppEvents() {
     }
     if (event.key === 'Escape') {
       if (!$('#callModal').classList.contains('hidden')) return;
+      if (!$('#stickerPanel').classList.contains('hidden')) {
+        event.preventDefault();
+        hide('#stickerPanel');
+        $('#messageInput')?.focus();
+        return;
+      }
+      if (!$('#messageSearchPanel').classList.contains('hidden')) {
+        event.preventDefault();
+        closeMessageSearch(false);
+        return;
+      }
       if (closeTopModal()) return;
       if ($('#appScreen').classList.contains('chat-open') && window.innerWidth <= 720) {
         $('#appScreen').classList.remove('chat-open');
