@@ -30,6 +30,13 @@
       <form id="loginForm" class="auth-form" data-auth-panel="login">
         <label>ID hoặc email<input id="loginId" autocomplete="username" required /></label>
         <label>Mật khẩu<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+        <label class="remember-row">
+          <input id="rememberLogin" type="checkbox" checked />
+          <span>
+            <strong>Lưu trạng thái đăng nhập</strong>
+            <small>Lần sau bấm Alt + K sẽ vào Kalo luôn trên thiết bị này.</small>
+          </span>
+        </label>
         <button class="primary-btn" type="submit">Đăng nhập</button>
         <p class="form-note">Bạn có thể đăng nhập bằng ID Kalo. Email chỉ cần khi bạn đã đăng ký email khôi phục.</p>
       </form>
@@ -241,6 +248,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.1.0"></script>
+  <script type="module" src="./app.js?v=1.1.1"></script>
 </body>
 </html>
