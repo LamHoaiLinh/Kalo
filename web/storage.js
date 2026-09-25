@@ -1,6 +1,5 @@
 const DB_NAME = 'kalo-local-storage';
 const STORE = 'settings';
-const DIRECTORY_KEY = 'documents-directory';
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -68,7 +67,9 @@ async function uniqueFileHandle(directory, wantedName) {
 }
 
 export class KaloDocuments {
-  constructor(callbacks = {}) {
+  constructor(userId, callbacks = {}) {
+    this.userId = userId || 'default';
+    this.directoryKey = `documents-directory:${this.userId}`;
     this.callbacks = callbacks;
     this.directoryHandle = null;
     this.mode = 'opfs';
@@ -81,7 +82,7 @@ export class KaloDocuments {
   }
 
   async init() {
-    const saved = await dbGet(DIRECTORY_KEY);
+    const saved = await dbGet(this.directoryKey);
     if (saved?.kind === 'directory') {
       this.directoryHandle = saved;
       this.mode = 'folder';
@@ -120,7 +121,7 @@ export class KaloDocuments {
     });
     const ok = await ensurePermission(handle, true);
     if (!ok) throw new Error('Kalo chưa được cấp quyền ghi vào thư mục này.');
-    await dbPut(DIRECTORY_KEY, handle);
+    await dbPut(this.directoryKey, handle);
     this.directoryHandle = handle;
     this.mode = 'folder';
     this.label = handle.name || 'Thư mục Kalo';
