@@ -59,6 +59,8 @@ const requiredIds = [
   'categoryCreateName',
   'categoryManagerList',
   'logoutBtn',
+  'returnKanbanBtn',
+  'quickLogoutBtn',
 ];
 
 for (const id of requiredIds) {
@@ -80,6 +82,7 @@ if (!app.includes("openConversationCategoryMenu(")) throw new Error('Conversatio
 if (!app.includes("renderCategoryFilterMenu(")) throw new Error('Conversation category filter UI is missing');
 if (!app.includes("createConversationCategory(")) throw new Error('Conversation category manager is missing');
 if (!html.includes('logout-icon-img')) throw new Error('Custom logout icon is missing');
+if (!app.includes("function returnToKanban(")) throw new Error('Standalone return-to-Kanban action is missing');
 if (!html.includes('id="imageBtn"') || !html.includes('compose-tool-image')) throw new Error('Custom image composer icon is missing');
 
 console.log('Kalo DOM binding smoke test passed.');
