@@ -1,12 +1,14 @@
-const CACHE='kalo-native-v4-media';
+const CACHE='kalo-native-v5-docs-calls';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.2.0',
-  './app.js?v=1.2.0',
+  './styles.css?v=1.3.0',
+  './app.js?v=1.3.0',
   './config.js',
   './crypto.js',
   './webrtc.js',
+  './storage.js',
+  './call.js',
   './vendor/qrcode.min.js',
   './vendor/qr-scanner.min.js',
   './vendor/qr-scanner-worker.min.js',
