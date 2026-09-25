@@ -1,8 +1,8 @@
-const CACHE='kalo-native-v7-sticker-esc-actions';
+const CACHE='kalo-native-v8-custom-composer-icons';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.4.1',
+  './styles.css?v=1.4.2',
   './app.js?v=1.4.1',
   './config.js',
   './crypto.js',
