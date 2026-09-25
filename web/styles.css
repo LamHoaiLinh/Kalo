@@ -942,3 +942,45 @@ body.privacy-mode .image-card:hover .image-preview{filter:none}
   .app-quick-action img{width:24px;height:24px}
   .chat-actions{margin-right:78px}
 }
+
+
+/* v1.5.3 - Keep composer visible in long chats */
+html,body{height:100%;min-height:0}
+body{overflow:hidden}
+.app-shell{
+  height:100vh;
+  height:100dvh;
+  min-height:0;
+  overflow:hidden;
+}
+.conversation-pane,
+.chat-pane{
+  min-height:0;
+  overflow:hidden;
+}
+.active-chat{
+  min-height:0;
+  overflow:hidden;
+}
+.chat-header,
+.message-search-panel,
+.file-progress,
+.composer{
+  flex:0 0 auto;
+}
+.message-list{
+  flex:1 1 0;
+  min-height:0;
+  height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+.composer{
+  position:relative;
+  z-index:4;
+}
+@media(max-width:720px){
+  body{overflow:hidden}
+  .chat-pane{min-height:0;overflow:hidden}
+  .active-chat{height:100%;min-height:0;overflow:hidden}
+}
