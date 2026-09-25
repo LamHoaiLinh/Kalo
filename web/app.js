@@ -87,6 +87,8 @@ const state = {
   activeCategoryFilter: 'all',
   categoryMenuConversationId: null,
   contactAliases: {},
+  avatarPendingDataUrl: '',
+  avatarCrop: null,
   qrScanner: null,
 };
 
@@ -353,31 +355,132 @@ function setAvatarElement(element, profile, fallbackLabel) {
 function updateProfileAvatarPreview() {
   const preview = $('#profileAvatarPreview');
   if (!preview) return;
-  setAvatarElement(preview, state.profile, state.profile?.display_name || state.profile?.username || 'K');
+  if (state.avatarPendingDataUrl) {
+    preview.innerHTML = `<img class="avatar-image" src="${escapeHtml(state.avatarPendingDataUrl)}" alt="" />`;
+    preview.classList.add('has-image');
+  } else {
+    setAvatarElement(preview, state.profile, state.profile?.display_name || state.profile?.username || 'K');
+  }
   const removeBtn = $('#removeAvatarBtn');
-  if (removeBtn) removeBtn.disabled = !safeAvatarUrl(state.profile?.avatar_url);
+  if (removeBtn) removeBtn.disabled = !state.avatarPendingDataUrl && !safeAvatarUrl(state.profile?.avatar_url);
+  const cropBtn = $('#cropAvatarBtn');
+  if (cropBtn) cropBtn.disabled = !state.avatarPendingDataUrl && !safeAvatarUrl(state.profile?.avatar_url) && !state.avatarCrop?.bitmap;
+  const saveBtn = $('#saveAvatarBtn');
+  if (saveBtn) saveBtn.disabled = !state.avatarPendingDataUrl;
+  $('#avatarPendingHint')?.classList.toggle('hidden', !state.avatarPendingDataUrl);
 }
 
-async function compressAvatar(file) {
-  if (!file?.type?.startsWith('image/')) throw new Error('Hãy chọn file ảnh.');
-  if (file.size > 12 * 1024 * 1024) throw new Error('Ảnh quá lớn. Vui lòng chọn ảnh dưới 12 MB.');
-  const bitmap = await createImageBitmap(file);
-  try {
-    const size = 256;
-    const side = Math.min(bitmap.width, bitmap.height);
-    const sx = Math.max(0, Math.floor((bitmap.width - side) / 2));
-    const sy = Math.max(0, Math.floor((bitmap.height - side) / 2));
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d', { alpha: false });
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size);
-    ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, size, size);
-    return canvas.toDataURL('image/jpeg', 0.82);
-  } finally {
-    bitmap.close?.();
+function closeAvatarCropSource() {
+  try { state.avatarCrop?.bitmap?.close?.(); } catch {}
+  state.avatarCrop = null;
+}
+
+function clampAvatarCrop() {
+  const crop = state.avatarCrop;
+  const canvas = $('#avatarCropCanvas');
+  if (!crop?.bitmap || !canvas) return;
+  const drawW = crop.bitmap.width * crop.scale;
+  const drawH = crop.bitmap.height * crop.scale;
+  const maxX = Math.max(0, (drawW - canvas.width) / 2);
+  const maxY = Math.max(0, (drawH - canvas.height) / 2);
+  crop.offsetX = Math.max(-maxX, Math.min(maxX, crop.offsetX));
+  crop.offsetY = Math.max(-maxY, Math.min(maxY, crop.offsetY));
+}
+
+function renderAvatarCrop() {
+  const crop = state.avatarCrop;
+  const canvas = $('#avatarCropCanvas');
+  if (!crop?.bitmap || !canvas) return;
+  clampAvatarCrop();
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const drawW = crop.bitmap.width * crop.scale;
+  const drawH = crop.bitmap.height * crop.scale;
+  const x = (canvas.width - drawW) / 2 + crop.offsetX;
+  const y = (canvas.height - drawH) / 2 + crop.offsetY;
+  ctx.fillStyle = '#eaf3ee';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(crop.bitmap, x, y, drawW, drawH);
+  const zoomPct = Math.round((crop.scale / crop.minScale) * 100);
+  $('#avatarZoomValue').textContent = `${zoomPct}%`;
+}
+
+function resetAvatarCrop() {
+  const crop = state.avatarCrop;
+  if (!crop) return;
+  crop.scale = crop.minScale;
+  crop.offsetX = 0;
+  crop.offsetY = 0;
+  $('#avatarZoomRange').value = '100';
+  renderAvatarCrop();
+}
+
+async function bitmapFromAvatarSource(source) {
+  if (source instanceof File || source instanceof Blob) {
+    return createImageBitmap(source, { imageOrientation: 'from-image' }).catch(() => createImageBitmap(source));
   }
+  const url = String(source || '');
+  if (!url) throw new Error('Chưa có ảnh để crop.');
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Không đọc được ảnh đại diện.');
+  const blob = await response.blob();
+  return createImageBitmap(blob, { imageOrientation: 'from-image' }).catch(() => createImageBitmap(blob));
+}
+
+async function openAvatarCrop(source, { replaceSource = true } = {}) {
+  let bitmap = null;
+  if (!replaceSource && state.avatarCrop?.bitmap) {
+    show('#avatarCropModal');
+    renderAvatarCrop();
+    return;
+  }
+  if (source instanceof File && source.size > 12 * 1024 * 1024) {
+    throw new Error('Ảnh quá lớn. Vui lòng chọn ảnh dưới 12 MB.');
+  }
+  if (source instanceof File && !source.type.startsWith('image/')) {
+    throw new Error('Hãy chọn file ảnh.');
+  }
+  bitmap = await bitmapFromAvatarSource(source);
+  closeAvatarCropSource();
+  const canvas = $('#avatarCropCanvas');
+  const minScale = Math.max(canvas.width / bitmap.width, canvas.height / bitmap.height);
+  state.avatarCrop = {
+    bitmap,
+    minScale,
+    scale: minScale,
+    offsetX: 0,
+    offsetY: 0,
+    dragging: false,
+    pointerId: null,
+    lastX: 0,
+    lastY: 0,
+  };
+  $('#avatarZoomRange').value = '100';
+  renderAvatarCrop();
+  show('#avatarCropModal');
+}
+
+function applyAvatarCropPreview() {
+  const source = $('#avatarCropCanvas');
+  if (!state.avatarCrop?.bitmap || !source) return;
+  const output = document.createElement('canvas');
+  output.width = 256;
+  output.height = 256;
+  const ctx = output.getContext('2d', { alpha: false });
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 256, 256);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(source, 0, 0, source.width, source.height, 0, 0, 256, 256);
+  state.avatarPendingDataUrl = output.toDataURL('image/jpeg', 0.84);
+  updateProfileAvatarPreview();
+  hide('#avatarCropModal');
+  toast('Đã áp dụng crop. Bấm “Lưu Avatar” để lưu chính thức.');
+}
+
+function cancelAvatarCrop() {
+  hide('#avatarCropModal');
 }
 
 async function saveOwnAvatar(avatarUrl) {
@@ -387,6 +490,8 @@ async function saveOwnAvatar(avatarUrl) {
     .eq('user_id', state.user.id);
   if (error) throw error;
   state.profile.avatar_url = avatarUrl || null;
+  state.avatarPendingDataUrl = '';
+  closeAvatarCropSource();
   await loadProfiles();
   state.profile = state.profiles.get(state.user.id) || state.profile;
   updateProfileAvatarPreview();
@@ -2395,6 +2500,8 @@ async function logout() {
   state.activeCategoryFilter = 'all';
   state.categoryMenuConversationId = null;
   state.contactAliases = {};
+  state.avatarPendingDataUrl = '';
+  closeAvatarCropSource();
   clearCallUi();
   hide('#settingsModal');
   hide('#appScreen');
@@ -2769,22 +2876,51 @@ function bindAppEvents() {
     event.target.value = '';
     if (!file) return;
     const button = $('#chooseAvatarBtn');
-    setBusy(button, true, 'Đang xử lý...');
+    setBusy(button, true, 'Đang mở...');
     try {
-      const dataUrl = await compressAvatar(file);
-      await saveOwnAvatar(dataUrl);
-      toast('Đã cập nhật ảnh đại diện.');
+      await openAvatarCrop(file);
     } catch (e) {
-      toast(e.message || 'Không cập nhật được ảnh đại diện.', 'error');
+      toast(e.message || 'Không mở được ảnh để crop.', 'error');
+    } finally {
+      setBusy(button, false);
+    }
+  });
+  $('#cropAvatarBtn').addEventListener('click', async () => {
+    const button = $('#cropAvatarBtn');
+    setBusy(button, true, 'Đang mở...');
+    try {
+      if (state.avatarCrop?.bitmap) {
+        await openAvatarCrop('', { replaceSource: false });
+      } else {
+        const source = state.avatarPendingDataUrl || safeAvatarUrl(state.profile?.avatar_url);
+        if (!source) throw new Error('Hãy chọn ảnh trước.');
+        await openAvatarCrop(source);
+      }
+    } catch (e) {
+      toast(e.message || 'Không mở được trình crop.', 'error');
+    } finally {
+      setBusy(button, false);
+    }
+  });
+  $('#saveAvatarBtn').addEventListener('click', async () => {
+    if (!state.avatarPendingDataUrl) return;
+    const button = $('#saveAvatarBtn');
+    setBusy(button, true, 'Đang lưu...');
+    try {
+      await saveOwnAvatar(state.avatarPendingDataUrl);
+      toast('Đã lưu Avatar.');
+    } catch (e) {
+      toast(e.message || 'Không lưu được Avatar.', 'error');
     } finally {
       setBusy(button, false);
     }
   });
   $('#removeAvatarBtn').addEventListener('click', async () => {
-    if (!safeAvatarUrl(state.profile?.avatar_url)) return;
+    if (!state.avatarPendingDataUrl && !safeAvatarUrl(state.profile?.avatar_url)) return;
     const button = $('#removeAvatarBtn');
     setBusy(button, true, '...');
     try {
+      state.avatarPendingDataUrl = '';
       await saveOwnAvatar('');
       toast('Đã xóa ảnh đại diện.');
     } catch (e) {
@@ -2793,6 +2929,51 @@ function bindAppEvents() {
       setBusy(button, false);
     }
   });
+
+  $('#avatarZoomRange').addEventListener('input', (event) => {
+    const crop = state.avatarCrop;
+    if (!crop) return;
+    crop.scale = crop.minScale * (Number(event.target.value || 100) / 100);
+    renderAvatarCrop();
+  });
+  $('#resetAvatarCropBtn').addEventListener('click', resetAvatarCrop);
+  $('#applyAvatarCropBtn').addEventListener('click', applyAvatarCropPreview);
+  $('#cancelAvatarCropBtn').addEventListener('click', cancelAvatarCrop);
+  $('#closeAvatarCropBtn').addEventListener('click', cancelAvatarCrop);
+
+  const cropCanvas = $('#avatarCropCanvas');
+  cropCanvas.addEventListener('pointerdown', (event) => {
+    const crop = state.avatarCrop;
+    if (!crop) return;
+    crop.dragging = true;
+    crop.pointerId = event.pointerId;
+    crop.lastX = event.clientX;
+    crop.lastY = event.clientY;
+    cropCanvas.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  });
+  cropCanvas.addEventListener('pointermove', (event) => {
+    const crop = state.avatarCrop;
+    if (!crop?.dragging || crop.pointerId !== event.pointerId) return;
+    const rect = cropCanvas.getBoundingClientRect();
+    const factorX = cropCanvas.width / Math.max(1, rect.width);
+    const factorY = cropCanvas.height / Math.max(1, rect.height);
+    crop.offsetX += (event.clientX - crop.lastX) * factorX;
+    crop.offsetY += (event.clientY - crop.lastY) * factorY;
+    crop.lastX = event.clientX;
+    crop.lastY = event.clientY;
+    renderAvatarCrop();
+    event.preventDefault();
+  });
+  const endCropDrag = (event) => {
+    const crop = state.avatarCrop;
+    if (!crop || crop.pointerId !== event.pointerId) return;
+    crop.dragging = false;
+    crop.pointerId = null;
+    try { cropCanvas.releasePointerCapture?.(event.pointerId); } catch {}
+  };
+  cropCanvas.addEventListener('pointerup', endCropDrag);
+  cropCanvas.addEventListener('pointercancel', endCropDrag);
 
   $('#renameContactBtn').addEventListener('click', openContactAliasModal);
   $('#contactAliasForm').addEventListener('submit', (event) => {
@@ -2905,6 +3086,7 @@ function bindAppEvents() {
     try { state.fileManager?.stop(); } catch {}
     try { state.callManager?.stop(); } catch {}
     try { state.qrScanner?.stop(); } catch {}
+    try { state.avatarCrop?.bitmap?.close?.(); } catch {}
   });
 }
 
