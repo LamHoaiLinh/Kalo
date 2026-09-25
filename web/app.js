@@ -82,6 +82,10 @@ const state = {
   startedUserId: null,
   pendingRecoveryCode: null,
   currentView: 'chats',
+  conversationCategories: [],
+  conversationCategoryMap: {},
+  activeCategoryFilter: 'all',
+  categoryMenuConversationId: null,
   qrScanner: null,
 };
 
@@ -91,6 +95,13 @@ const STICKERS = [
   '😴','🥺','😭','😤','😡','😱','🤯','🤦',
   '👍','👏','🙏','💪','❤️','💚','🔥','🎉',
   '🌷','🌻','🍀','☕','🎂','🎁','🚗','🏃'
+];
+
+const DEFAULT_CONVERSATION_CATEGORIES = [
+  { id: 'family', name: 'Gia đình', color: '#43c77a' },
+  { id: 'friends', name: 'Bạn bè', color: '#f5b400' },
+  { id: 'work', name: 'Công việc', color: '#0f69ea' },
+  { id: 'important', name: 'Quan trọng', color: '#e01b24' },
 ];
 
 function show(el) {
@@ -263,6 +274,224 @@ function friendProfileFromRow(row) {
   return state.profiles.get(otherId) || null;
 }
 
+
+
+function categoryStorageKey() {
+  return state.user?.id ? `kalo-conversation-categories:${state.user.id}` : '';
+}
+
+function safeCategoryColor(value, fallback = '#43c77a') {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
+}
+
+function loadConversationCategories() {
+  const key = categoryStorageKey();
+  let parsed = null;
+  try { parsed = key ? JSON.parse(localStorage.getItem(key) || 'null') : null; } catch {}
+  const source = Array.isArray(parsed?.categories) && parsed.categories.length
+    ? parsed.categories
+    : DEFAULT_CONVERSATION_CATEGORIES;
+  state.conversationCategories = source.map((item) => ({
+    id: String(item.id || crypto.randomUUID()),
+    name: String(item.name || 'Phân loại').trim().slice(0, 30) || 'Phân loại',
+    color: safeCategoryColor(item.color),
+  }));
+  state.conversationCategoryMap = parsed?.assignments && typeof parsed.assignments === 'object'
+    ? { ...parsed.assignments }
+    : {};
+  state.activeCategoryFilter = 'all';
+  state.categoryMenuConversationId = null;
+  saveConversationCategories();
+  updateCategoryFilterButton();
+}
+
+function saveConversationCategories() {
+  const key = categoryStorageKey();
+  if (!key) return;
+  localStorage.setItem(key, JSON.stringify({
+    version: 1,
+    categories: state.conversationCategories,
+    assignments: state.conversationCategoryMap,
+  }));
+}
+
+function categoryById(id) {
+  return state.conversationCategories.find((item) => item.id === id) || null;
+}
+
+function conversationCategory(conversationId) {
+  return categoryById(state.conversationCategoryMap[conversationId]);
+}
+
+function updateCategoryFilterButton() {
+  const label = $('#categoryFilterLabel');
+  const dot = $('#categoryFilterDot');
+  if (!label || !dot) return;
+  const active = categoryById(state.activeCategoryFilter);
+  label.textContent = active?.name || 'Phân loại';
+  dot.style.background = active?.color || 'transparent';
+  dot.classList.toggle('empty', !active);
+}
+
+function setCategoryFilter(categoryId = 'all') {
+  state.activeCategoryFilter = categoryById(categoryId) ? categoryId : 'all';
+  hide('#categoryFilterMenu');
+  updateCategoryFilterButton();
+  renderCategoryFilterMenu();
+  renderConversationList();
+}
+
+function renderCategoryFilterMenu() {
+  const root = $('#categoryFilterMenu');
+  if (!root) return;
+  root.innerHTML = `
+    <button class="category-menu-item ${state.activeCategoryFilter === 'all' ? 'active' : ''}" type="button" data-category-filter="all">
+      <span class="category-menu-icon all">●</span><span>Tất cả</span>
+    </button>
+    ${state.conversationCategories.map((item) => `
+      <button class="category-menu-item ${state.activeCategoryFilter === item.id ? 'active' : ''}" type="button" data-category-filter="${escapeHtml(item.id)}">
+        <span class="category-color-tag" style="--category-color:${safeCategoryColor(item.color)}"></span>
+        <span>${escapeHtml(item.name)}</span>
+      </button>`).join('')}
+    <div class="category-menu-separator"></div>
+    <button class="category-menu-item manage" type="button" data-manage-categories>⚙ <span>Quản lý phân loại</span></button>
+  `;
+  $('[data-category-filter]', root).forEach((btn) => btn.addEventListener('click', () => setCategoryFilter(btn.dataset.categoryFilter)));
+  $('[data-manage-categories]', root)?.addEventListener('click', () => {
+    hide('#categoryFilterMenu');
+    openCategoryManager();
+  });
+  updateCategoryFilterButton();
+}
+
+function toggleCategoryFilterMenu() {
+  const root = $('#categoryFilterMenu');
+  if (!root) return;
+  if (root.classList.contains('hidden')) {
+    renderCategoryFilterMenu();
+    show(root);
+    hide('#conversationCategoryMenu');
+  } else {
+    hide(root);
+  }
+}
+
+function renderCategoryManager() {
+  const root = $('#categoryManagerList');
+  if (!root) return;
+  root.innerHTML = state.conversationCategories.map((item) => `
+    <div class="category-manager-row" data-category-row="${escapeHtml(item.id)}">
+      <input class="category-color-input" type="color" value="${safeCategoryColor(item.color)}" data-category-color="${escapeHtml(item.id)}" title="Đổi màu" />
+      <input class="category-name-input" value="${escapeHtml(item.name)}" maxlength="30" data-category-name="${escapeHtml(item.id)}" aria-label="Tên phân loại" />
+      <button class="category-delete-btn" type="button" data-category-delete="${escapeHtml(item.id)}" title="Xóa phân loại">🗑</button>
+    </div>
+  `).join('') || '<div class="category-empty">Chưa có phân loại. Hãy tạo một thẻ mới ở phía trên.</div>';
+
+  $('[data-category-color]', root).forEach((input) => input.addEventListener('input', () => {
+    const item = categoryById(input.dataset.categoryColor);
+    if (!item) return;
+    item.color = safeCategoryColor(input.value, item.color);
+    saveConversationCategories();
+    renderCategoryFilterMenu();
+    renderConversationList();
+  }));
+  $('[data-category-name]', root).forEach((input) => input.addEventListener('change', () => {
+    const item = categoryById(input.dataset.categoryName);
+    if (!item) return;
+    const name = input.value.trim().slice(0, 30);
+    if (!name) {
+      input.value = item.name;
+      return;
+    }
+    item.name = name;
+    saveConversationCategories();
+    renderCategoryFilterMenu();
+    renderConversationList();
+  }));
+  $('[data-category-delete]', root).forEach((btn) => btn.addEventListener('click', () => {
+    const item = categoryById(btn.dataset.categoryDelete);
+    if (!item) return;
+    if (!window.confirm(`Xóa phân loại “${item.name}”? Cuộc trò chuyện sẽ chỉ bị bỏ thẻ, không bị xóa.`)) return;
+    deleteConversationCategory(item.id);
+  }));
+}
+
+function openCategoryManager() {
+  renderCategoryManager();
+  $('#categoryCreateName').value = '';
+  $('#categoryCreateColor').value = '#43c77a';
+  show('#categoryManagerModal');
+  setTimeout(() => $('#categoryCreateName')?.focus(), 60);
+}
+
+function createConversationCategory(name, color) {
+  const cleanName = String(name || '').trim().slice(0, 30);
+  if (!cleanName) throw new Error('Hãy nhập tên phân loại.');
+  const item = { id: crypto.randomUUID(), name: cleanName, color: safeCategoryColor(color) };
+  state.conversationCategories.push(item);
+  saveConversationCategories();
+  renderCategoryManager();
+  renderCategoryFilterMenu();
+  renderConversationList();
+  return item;
+}
+
+function deleteConversationCategory(categoryId) {
+  state.conversationCategories = state.conversationCategories.filter((item) => item.id !== categoryId);
+  for (const [conversationId, assigned] of Object.entries(state.conversationCategoryMap)) {
+    if (assigned === categoryId) delete state.conversationCategoryMap[conversationId];
+  }
+  if (state.activeCategoryFilter === categoryId) state.activeCategoryFilter = 'all';
+  saveConversationCategories();
+  renderCategoryManager();
+  renderCategoryFilterMenu();
+  renderConversationList();
+  updateCategoryFilterButton();
+}
+
+function assignConversationCategory(conversationId, categoryId = '') {
+  if (!conversationId) return;
+  if (categoryId && categoryById(categoryId)) state.conversationCategoryMap[conversationId] = categoryId;
+  else delete state.conversationCategoryMap[conversationId];
+  saveConversationCategories();
+  hide('#conversationCategoryMenu');
+  renderConversationList();
+}
+
+function openConversationCategoryMenu(conversationId, anchor) {
+  const root = $('#conversationCategoryMenu');
+  if (!root || !anchor) return;
+  state.categoryMenuConversationId = conversationId;
+  const activeId = state.conversationCategoryMap[conversationId] || '';
+  root.innerHTML = `
+    <button class="category-menu-item ${!activeId ? 'active' : ''}" type="button" data-assign-category="">○ <span>Không phân loại</span></button>
+    ${state.conversationCategories.map((item) => `
+      <button class="category-menu-item ${activeId === item.id ? 'active' : ''}" type="button" data-assign-category="${escapeHtml(item.id)}">
+        <span class="category-color-tag" style="--category-color:${safeCategoryColor(item.color)}"></span>
+        <span>${escapeHtml(item.name)}</span>
+      </button>`).join('')}
+    <div class="category-menu-separator"></div>
+    <button class="category-menu-item manage" type="button" data-manage-categories>⚙ <span>Quản lý phân loại</span></button>
+  `;
+  $('[data-assign-category]', root).forEach((btn) => btn.addEventListener('click', () => {
+    assignConversationCategory(conversationId, btn.dataset.assignCategory || '');
+  }));
+  $('[data-manage-categories]', root)?.addEventListener('click', () => {
+    hide(root);
+    openCategoryManager();
+  });
+
+  const rect = anchor.getBoundingClientRect();
+  show(root);
+  const menuWidth = Math.max(190, root.offsetWidth || 220);
+  const menuHeight = root.offsetHeight || 200;
+  const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth));
+  const top = Math.max(8, Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 5));
+  root.style.left = `${left}px`;
+  root.style.top = `${top}px`;
+  hide('#categoryFilterMenu');
+}
 
 async function setSessionFromResponse(session) {
   if (!session?.access_token || !session?.refresh_token) throw new Error('Phiên đăng nhập không hợp lệ.');
@@ -1009,24 +1238,42 @@ function renderConversationList() {
     return new Date(bt) - new Date(at);
   });
 
-  list.innerHTML = sorted
-    .filter((conv) => conversationLabel(conv).toLowerCase().includes(query))
-    .map((conv) => {
-      const label = conversationLabel(conv);
-      const preview = state.previews.get(conv.id);
-      const otherId = conv.kind === 'direct' ? memberIds(conv.id).find((id) => id !== state.user.id) : null;
-      const online = otherId && isOnline(otherId);
-      return `<button class="conv-item ${conv.id === state.currentConversationId ? 'active' : ''}" data-conv-id="${conv.id}">
+  const visible = sorted.filter((conv) => {
+    const queryOk = conversationLabel(conv).toLowerCase().includes(query);
+    const categoryOk = state.activeCategoryFilter === 'all'
+      || state.conversationCategoryMap[conv.id] === state.activeCategoryFilter;
+    return queryOk && categoryOk;
+  });
+
+  list.innerHTML = visible.map((conv) => {
+    const label = conversationLabel(conv);
+    const preview = state.previews.get(conv.id);
+    const otherId = conv.kind === 'direct' ? memberIds(conv.id).find((id) => id !== state.user.id) : null;
+    const online = otherId && isOnline(otherId);
+    const category = conversationCategory(conv.id);
+    const categoryBadge = category
+      ? `<span class="conv-category-badge" style="--category-color:${safeCategoryColor(category.color)}"><i></i>${escapeHtml(category.name)}</span>`
+      : '';
+    return `<div class="conv-row ${conv.id === state.currentConversationId ? 'active' : ''}">
+      <button class="conv-item ${conv.id === state.currentConversationId ? 'active' : ''}" data-conv-id="${conv.id}" type="button">
         <div class="avatar">${escapeHtml(conversationAvatar(conv))}</div>
         <div class="conv-main">
-          <div class="conv-name">${escapeHtml(label)}${online ? ' · 🟢' : ''}</div>
+          <div class="conv-name-line"><div class="conv-name">${escapeHtml(label)}${online ? ' · 🟢' : ''}</div>${categoryBadge}</div>
           <div class="conv-preview">${escapeHtml(preview?.text || 'Bắt đầu trò chuyện')}</div>
         </div>
         <div class="conv-meta">${escapeHtml(formatTime(preview?.created_at || conv.created_at))}</div>
-      </button>`;
-    }).join('') || '<div class="empty-chat" style="padding:32px 10px"><p>Chưa có cuộc trò chuyện.</p></div>';
+      </button>
+      <button class="conv-classify-btn" type="button" data-classify-conv="${conv.id}" title="Phân loại cuộc trò chuyện" aria-label="Phân loại ${escapeHtml(label)}">
+        <span style="--category-color:${category ? safeCategoryColor(category.color) : '#aebdb5'}"></span>🏷
+      </button>
+    </div>`;
+  }).join('') || '<div class="empty-chat" style="padding:32px 10px"><p>Không có cuộc trò chuyện phù hợp.</p></div>';
 
-  $$('[data-conv-id]', list).forEach((btn) => btn.addEventListener('click', () => openConversation(btn.dataset.convId)));
+  $('[data-conv-id]', list).forEach((btn) => btn.addEventListener('click', () => openConversation(btn.dataset.convId)));
+  $('[data-classify-conv]', list).forEach((btn) => btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    openConversationCategoryMenu(btn.dataset.classifyConv, btn);
+  }));
 }
 
 function renderPeopleList() {
@@ -1212,6 +1459,7 @@ function renderMessages() {
 async function openConversation(id) {
   state.currentConversationId = id;
   state.currentView = 'chats';
+  hide('#conversationCategoryMenu');
   closeMessageSearch(false);
   $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === 'chats'));
   renderConversationList();
@@ -1669,13 +1917,16 @@ async function toggleHeart(messageId) {
 
 function setView(view) {
   state.currentView = view;
-  $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  $('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   const search = $('#conversationSearch');
   hide('#conversationList');
   hide('#peopleList');
   hide('#documentsList');
   hide('#addFriendBtn');
   hide('#createGroupBtn');
+  hide('#categoryFilterWrap');
+  hide('#categoryFilterMenu');
+  hide('#conversationCategoryMenu');
 
   if (view === 'documents') {
     $('#leftPaneTitle').textContent = 'My Documents';
@@ -1712,6 +1963,8 @@ function setView(view) {
     $('#leftPaneTitle').textContent = 'Tin nhắn';
     search.placeholder = 'Tìm cuộc trò chuyện...';
     show('#createGroupBtn');
+    show('#categoryFilterWrap');
+    renderCategoryFilterMenu();
     show('#conversationList');
     renderConversationList();
   }
@@ -1901,6 +2154,7 @@ async function startApp(session) {
     state.session = session;
     state.user = session.user;
     state.profile = await getProfile(session.user.id);
+    loadConversationCategories();
     state.identity = await ensureUserIdentity(state.pendingRecoveryCode);
     state.pendingRecoveryCode = null;
 
@@ -1951,6 +2205,10 @@ async function logout() {
   state.documentsManager = null;
   state.documentItems = [];
   state.selectedDocumentName = null;
+  state.conversationCategories = [];
+  state.conversationCategoryMap = {};
+  state.activeCategoryFilter = 'all';
+  state.categoryMenuConversationId = null;
   clearCallUi();
   hide('#settingsModal');
   hide('#appScreen');
@@ -2114,7 +2372,21 @@ async function initAuth() {
 }
 
 function bindAppEvents() {
-  $$('.rail-btn[data-view]').forEach((btn) => btn.addEventListener('click', () => setView(btn.dataset.view)));
+  $('.rail-btn[data-view]').forEach((btn) => btn.addEventListener('click', () => setView(btn.dataset.view)));
+  $('#categoryFilterBtn').addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleCategoryFilterMenu();
+  });
+  $('#categoryCreateForm').addEventListener('submit', (event) => {
+    event.preventDefault();
+    try {
+      createConversationCategory($('#categoryCreateName').value, $('#categoryCreateColor').value);
+      $('#categoryCreateName').value = '';
+      $('#categoryCreateName').focus();
+    } catch (e) {
+      toast(e.message || 'Không tạo được phân loại.', 'error');
+    }
+  });
   $('#conversationSearch').addEventListener('input', () => {
     if (state.currentView === 'people') renderPeopleList();
     else if (state.currentView === 'documents') renderDocumentsList();
@@ -2177,11 +2449,15 @@ function bindAppEvents() {
     } catch {}
   });
 
-  $$('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => {
     const id = btn.dataset.closeModal;
     if (id === 'addFriendModal') stopQrScanner();
     hide(`#${id}`);
   }));
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('#categoryFilterWrap')) hide('#categoryFilterMenu');
+    if (!event.target.closest('#conversationCategoryMenu') && !event.target.closest('[data-classify-conv]')) hide('#conversationCategoryMenu');
+  });
 
   $('#sendBtn').addEventListener('click', sendMessage);
   $('#messageInput').addEventListener('keydown', (event) => {
@@ -2356,6 +2632,16 @@ function bindAppEvents() {
     }
     if (event.key === 'Escape') {
       if (!$('#callModal').classList.contains('hidden')) return;
+      if (!$('#conversationCategoryMenu').classList.contains('hidden')) {
+        event.preventDefault();
+        hide('#conversationCategoryMenu');
+        return;
+      }
+      if (!$('#categoryFilterMenu').classList.contains('hidden')) {
+        event.preventDefault();
+        hide('#categoryFilterMenu');
+        return;
+      }
       if (!$('#stickerPanel').classList.contains('hidden')) {
         event.preventDefault();
         hide('#stickerPanel');
