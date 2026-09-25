@@ -71,6 +71,17 @@ const requiredIds = [
   'contactAliasForm',
   'contactAliasInput',
   'resetContactAliasBtn',
+  'cropAvatarBtn',
+  'saveAvatarBtn',
+  'avatarPendingHint',
+  'avatarCropModal',
+  'avatarCropCanvas',
+  'avatarZoomRange',
+  'avatarZoomValue',
+  'resetAvatarCropBtn',
+  'cancelAvatarCropBtn',
+  'applyAvatarCropBtn',
+  'closeAvatarCropBtn',
 ];
 
 for (const id of requiredIds) {
@@ -94,8 +105,11 @@ if (!app.includes("createConversationCategory(")) throw new Error('Conversation 
 if (!app.includes("notifyParentOfIncomingMessage(")) throw new Error('Kanban incoming-message notification bridge is missing');
 if (!app.includes("event.code === 'Period'")) throw new Error('Alt period privacy shortcut is missing');
 if (!css.includes("Keep composer visible in long chats")) throw new Error('Long-chat composer layout fix is missing');
-if (!app.includes("async function compressAvatar(")) throw new Error('Avatar compression flow is missing');
+if (!app.includes("async function openAvatarCrop(")) throw new Error('Manual avatar crop opener is missing');
 if (!app.includes("saveOwnAvatar(")) throw new Error('Avatar profile save flow is missing');
+if (!app.includes("applyAvatarCropPreview(")) throw new Error('Avatar crop preview flow is missing');
+if (!app.includes("pointermove")) throw new Error('Draggable avatar crop flow is missing');
+if (!app.includes("avatarPendingDataUrl")) throw new Error('Explicit avatar save staging is missing');
 if (!app.includes("contactAliasStorageKey(")) throw new Error('Private contact nickname storage is missing');
 if (!app.includes("openContactAliasModal(")) throw new Error('Contact nickname UI flow is missing');
 if (!html.includes('logout-icon-img')) throw new Error('Custom logout icon is missing');
