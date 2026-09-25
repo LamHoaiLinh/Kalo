@@ -73,6 +73,14 @@ const state = {
   qrScanner: null,
 };
 
+const STICKERS = [
+  '😀','😄','😂','🤣','😊','😍','🥰','😘',
+  '😎','🤩','🥳','😇','🤗','🤭','🫡','🤔',
+  '😴','🥺','😭','😤','😡','😱','🤯','🤦',
+  '👍','👏','🙏','💪','❤️','💚','🔥','🎉',
+  '🌷','🌻','🍀','☕','🎂','🎁','🚗','🏃'
+];
+
 function show(el) {
   if (typeof el === 'string') el = $(el);
   el?.classList.remove('hidden');
@@ -461,7 +469,14 @@ async function refreshPreviews() {
     try {
       const decoded = await decryptPayload(row.encrypted_payloads, state.user.id, state.identity);
       state.previews.set(row.conversation_id, {
-        text: row.kind === 'file_offer' ? `📎 ${decoded.name || 'File'}` : decoded.text || 'Tin nhắn',
+        text:
+          decoded.type === 'sticker'
+            ? `${decoded.sticker || '🙂'} Sticker`
+            : decoded.type === 'image'
+              ? `🖼 ${decoded.name || 'Ảnh'}`
+              : row.kind === 'file_offer'
+                ? `📎 ${decoded.name || 'File'}`
+                : decoded.text || 'Tin nhắn',
         created_at: row.created_at,
       });
     } catch {
@@ -674,6 +689,23 @@ function renderMessages() {
 
     if (m.decoded.type === 'locked') {
       body = `<div class="bubble-text">${escapeHtml(m.decoded.text)}</div>`;
+    } else if (m.decoded.type === 'sticker') {
+      body = `<div class="sticker-message" aria-label="Sticker">${escapeHtml(m.decoded.sticker || '🙂')}</div>`;
+    } else if (m.decoded.type === 'image') {
+      const canReceive = !own;
+      const preview = typeof m.decoded.thumbnail === 'string' && m.decoded.thumbnail.startsWith('data:image/')
+        ? `<img class="image-preview" src="${escapeHtml(m.decoded.thumbnail)}" alt="${escapeHtml(m.decoded.name || 'Ảnh')}" />`
+        : '<div class="image-preview-placeholder">🖼</div>';
+      body = `<div class="file-card image-card">
+        ${preview}
+        <div class="file-card-head image-meta">
+          <div style="min-width:0">
+            <div class="file-name">${escapeHtml(m.decoded.name || 'Ảnh')}</div>
+            <div class="file-size">${escapeHtml(formatBytes(m.decoded.size))} · ảnh gốc truyền trực tiếp</div>
+          </div>
+        </div>
+        ${canReceive ? `<button class="secondary-btn" data-receive-file="${m.id}" type="button">Nhận ảnh gốc</button>` : '<div class="file-size" style="margin-top:8px">Giữ Kalo mở để người nhận lấy ảnh gốc.</div>'}
+      </div>`;
     } else if (m.kind === 'file_offer' || m.decoded.type === 'file') {
       const canReceive = !own;
       body = `<div class="file-card">
@@ -975,6 +1007,93 @@ async function createGroupFromPicker() {
   toast('Đã tạo nhóm.');
 }
 
+function renderStickerGrid() {
+  const root = $('#stickerGrid');
+  if (!root) return;
+  root.innerHTML = STICKERS.map((sticker) =>
+    `<button class="sticker-choice" type="button" data-sticker="${escapeHtml(sticker)}" aria-label="Sticker ${escapeHtml(sticker)}">${escapeHtml(sticker)}</button>`
+  ).join('');
+  $('[data-sticker]', root).forEach((btn) => btn.addEventListener('click', () => {
+    sendSticker(btn.dataset.sticker).catch((e) => toast(e.message || 'Không gửi được sticker.', 'error'));
+  }));
+}
+
+async function sendSticker(sticker) {
+  if (!sticker || !state.currentConversationId) return;
+  const profiles = memberProfiles(state.currentConversationId);
+  if (!profiles.length) return;
+  const envelope = await encryptPayload({ type: 'sticker', sticker, createdAt: Date.now() }, profiles);
+  const { error } = await supabase.from('kalo_messages').insert({
+    id: crypto.randomUUID(),
+    conversation_id: state.currentConversationId,
+    sender_id: state.user.id,
+    kind: 'text',
+    encrypted_payloads: envelope,
+  });
+  if (error) throw error;
+  hide('#stickerPanel');
+  await loadMessages(state.currentConversationId);
+  await refreshPreviews();
+  renderConversationList();
+}
+
+async function makeImageThumbnail(file) {
+  if (!file?.type?.startsWith('image/')) return null;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 360;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close?.();
+    return canvas.toDataURL('image/jpeg', 0.58);
+  } catch {
+    return null;
+  }
+}
+
+async function sendTransferFile(file, type = 'file') {
+  if (!file || !state.currentConversationId) return;
+  const profiles = memberProfiles(state.currentConversationId);
+  if (!profiles.length) return;
+
+  const transferId = crypto.randomUUID();
+  const thumbnail = type === 'image' ? await makeImageThumbnail(file) : null;
+  const envelope = await encryptPayload({
+    type,
+    transferId,
+    name: file.name,
+    size: file.size,
+    mime: file.type || 'application/octet-stream',
+    thumbnail,
+    createdAt: Date.now(),
+  }, profiles);
+
+  state.fileManager.registerOutgoing(transferId, file);
+  const { error } = await supabase.from('kalo_messages').insert({
+    id: crypto.randomUUID(),
+    conversation_id: state.currentConversationId,
+    sender_id: state.user.id,
+    kind: 'file_offer',
+    encrypted_payloads: envelope,
+  });
+  if (error) throw error;
+
+  toast(type === 'image'
+    ? 'Đã gửi ảnh xem trước. Hãy giữ Kalo mở để người nhận lấy ảnh gốc.'
+    : 'Đã gửi lời mời nhận file. Hãy giữ Kalo mở cho tới khi truyền xong.');
+  await loadMessages(state.currentConversationId);
+  await refreshPreviews();
+  renderConversationList();
+}
+
 async function sendMessage() {
   const input = $('#messageInput');
   const text = input.value.trim();
@@ -1007,32 +1126,18 @@ async function sendMessage() {
 }
 
 async function sendFile(file) {
-  if (!file || !state.currentConversationId) return;
-  const profiles = memberProfiles(state.currentConversationId);
   try {
-    const transferId = crypto.randomUUID();
-    const envelope = await encryptPayload({
-      type: 'file',
-      transferId,
-      name: file.name,
-      size: file.size,
-      mime: file.type || 'application/octet-stream',
-      createdAt: Date.now(),
-    }, profiles);
-
-    state.fileManager.registerOutgoing(transferId, file);
-    const { error } = await supabase.from('kalo_messages').insert({
-      id: crypto.randomUUID(),
-      conversation_id: state.currentConversationId,
-      sender_id: state.user.id,
-      kind: 'file_offer',
-      encrypted_payloads: envelope,
-    });
-    if (error) throw error;
-    toast('Đã gửi lời mời nhận file. Hãy giữ Kalo mở cho tới khi truyền xong.');
-    await loadMessages(state.currentConversationId);
+    await sendTransferFile(file, 'file');
   } catch (e) {
     toast(e.message || 'Không thể gửi file.', 'error');
+  }
+}
+
+async function sendImage(file) {
+  try {
+    await sendTransferFile(file, 'image');
+  } catch (e) {
+    toast(e.message || 'Không thể gửi ảnh.', 'error');
   }
 }
 
@@ -1415,7 +1520,20 @@ function bindAppEvents() {
     event.currentTarget.style.height = `${Math.min(120, event.currentTarget.scrollHeight)}px`;
   });
 
-  $('#attachBtn').addEventListener('click', () => $('#fileInput').click());
+  renderStickerGrid();
+  $('#stickerBtn').addEventListener('click', () => {
+    $('#stickerPanel').classList.toggle('hidden');
+  });
+  $('#closeStickerBtn').addEventListener('click', () => hide('#stickerPanel'));
+
+  $('#imageBtn').addEventListener('click', () => $('#imageInput').click());
+  $('#imageInput').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) await sendImage(file);
+  });
+
+  $('#fileBtn').addEventListener('click', () => $('#fileInput').click());
   $('#fileInput').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
