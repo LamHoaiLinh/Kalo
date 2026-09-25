@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.6.2" />
+  <link rel="stylesheet" href="./styles.css?v=1.6.3" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -86,7 +86,9 @@
       </button>
     </div>
     <aside class="rail">
-      <button class="rail-logo" type="button" title="Kalo"><img src="./icon.svg" alt="Kalo" /></button>
+      <button id="selfAvatarBtn" class="rail-logo" type="button" title="Tài khoản của tôi">
+        <span id="selfAvatar" class="rail-self-avatar"><img src="./icon.svg" alt="Kalo" /></span>
+      </button>
       <div class="rail-main">
         <button class="rail-btn active" data-view="chats" type="button" title="Tin nhắn">💬<span>Tin</span></button>
         <button class="rail-btn" data-view="people" type="button" title="Danh bạ">👥<span>Bạn</span></button>
@@ -449,6 +451,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.6.2"></script>
+  <script type="module" src="./app.js?v=1.6.3"></script>
 </body>
 </html>
