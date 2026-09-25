@@ -83,6 +83,8 @@ const requiredIds = [
   'applyAvatarCropBtn',
   'closeAvatarCropBtn',
   'scrollToLatestBtn',
+  'selfAvatarBtn',
+  'selfAvatar',
 ];
 
 for (const id of requiredIds) {
@@ -113,6 +115,8 @@ if (!app.includes("pointermove")) throw new Error('Draggable avatar crop flow is
 if (!app.includes("avatarPendingDataUrl")) throw new Error('Explicit avatar save staging is missing');
 if (!app.includes("scrollMessagesToLatest(")) throw new Error('Jump-to-latest message flow is missing');
 if (!app.includes("updateScrollToLatestButton(")) throw new Error('Jump-to-latest visibility flow is missing');
+if (!app.includes("function updateSelfAvatar(")) throw new Error('Own rail avatar update flow is missing');
+if (!app.includes("table: 'kalo_profiles'")) throw new Error('Realtime profile/avatar sync is missing');
 if (!css.includes("#avatarCropModal")) throw new Error('Avatar crop priority styling is missing');
 if (!app.includes("contactAliasStorageKey(")) throw new Error('Private contact nickname storage is missing');
 if (!app.includes("openContactAliasModal(")) throw new Error('Contact nickname UI flow is missing');
