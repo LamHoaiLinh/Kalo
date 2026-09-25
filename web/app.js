@@ -1196,15 +1196,15 @@ function renderMessages() {
     </div>`;
   }).join('');
 
-  $('[data-heart]', list).forEach((btn) => btn.addEventListener('click', () => toggleHeart(btn.dataset.heart)));
-  $('[data-receive-file]', list).forEach((btn) => btn.addEventListener('click', () => receiveFile(btn.dataset.receiveFile)));
-  $('[data-my-doc-open]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-heart]', list).forEach((btn) => btn.addEventListener('click', () => toggleHeart(btn.dataset.heart)));
+  $$('[data-receive-file]', list).forEach((btn) => btn.addEventListener('click', () => receiveFile(btn.dataset.receiveFile)));
+  $$('[data-my-doc-open]', list).forEach((btn) => btn.addEventListener('click', () => {
     state.documentsManager.open(btn.dataset.myDocOpen).catch((e) => toast(e.message || 'Không mở được file.', 'error'));
   }));
-  $('[data-my-doc-download]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-my-doc-download]', list).forEach((btn) => btn.addEventListener('click', () => {
     state.documentsManager.download(btn.dataset.myDocDownload).catch((e) => toast(e.message || 'Không tải được file.', 'error'));
   }));
-  $('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
     removeMyDocumentMessage(btn.dataset.myDocRemove).catch((e) => toast(e.message || 'Không xóa được nội dung.', 'error'));
   }));
 }
@@ -1808,7 +1808,7 @@ function renderMessageSearchResults(matches = null) {
       <small>${escapeHtml(new Date(m.created_at).toLocaleString('vi-VN'))}</small>
     </button>`;
   }).join('') || '<div class="message-search-empty">Không có tin nhắn phù hợp.</div>';
-  $('[data-search-message-id]', root).forEach((btn) => btn.addEventListener('click', () => jumpToSearchMessage(btn.dataset.searchMessageId)));
+  $$('[data-search-message-id]', root).forEach((btn) => btn.addEventListener('click', () => jumpToSearchMessage(btn.dataset.searchMessageId)));
 }
 
 async function runMessageSearch() {
