@@ -352,6 +352,52 @@ function setAvatarElement(element, profile, fallbackLabel) {
   }
 }
 
+function avatarViewerProfile(userId) {
+  if (!userId) return null;
+  if (userId === state.user?.id) return state.profile || state.profiles.get(userId) || null;
+  return state.profiles.get(userId) || null;
+}
+
+function openAvatarViewer(userId) {
+  const profile = avatarViewerProfile(userId);
+  const url = safeAvatarUrl(profile?.avatar_url);
+  if (!url) {
+    toast('Tài khoản này chưa có ảnh đại diện.', 'error');
+    return;
+  }
+  const name = userId === state.user?.id
+    ? (state.profile?.display_name || state.profile?.username || 'Ảnh đại diện của tôi')
+    : contactDisplayName(userId);
+  $('#avatarViewerImage').src = url;
+  $('#avatarViewerImage').alt = `Ảnh đại diện của ${name}`;
+  $('#avatarViewerName').textContent = name;
+  show('#avatarViewerModal');
+}
+
+function closeAvatarViewer() {
+  hide('#avatarViewerModal');
+  $('#avatarViewerImage').removeAttribute('src');
+  $('#avatarViewerName').textContent = '';
+}
+
+function markAvatarClickable(element, userId) {
+  if (!element) return;
+  if (userId) element.dataset.avatarUser = userId;
+  else delete element.dataset.avatarUser;
+  const profile = avatarViewerProfile(userId);
+  const hasImage = Boolean(safeAvatarUrl(profile?.avatar_url));
+  element.classList.toggle('avatar-clickable', hasImage);
+  if (hasImage) {
+    element.setAttribute('role', 'button');
+    element.setAttribute('tabindex', '0');
+    element.setAttribute('title', 'Bấm để xem ảnh đại diện');
+  } else {
+    element.removeAttribute('role');
+    element.removeAttribute('tabindex');
+    element.removeAttribute('title');
+  }
+}
+
 function updateSelfAvatar() {
   const root = $('#selfAvatar');
   if (!root) return;
@@ -364,9 +410,13 @@ function updateSelfAvatar() {
     root.classList.remove('has-image');
   }
   const button = $('#selfAvatarBtn');
-  if (button) button.title = state.profile?.display_name
-    ? `${state.profile.display_name} · Tài khoản của tôi`
-    : 'Tài khoản của tôi';
+  if (button) {
+    button.title = state.profile?.display_name
+      ? `${state.profile.display_name} · Xem ảnh đại diện`
+      : 'Xem ảnh đại diện';
+    button.dataset.avatarUser = state.user?.id || '';
+  }
+  markAvatarClickable(root, state.user?.id);
 }
 
 function updateProfileAvatarPreview() {
@@ -375,8 +425,12 @@ function updateProfileAvatarPreview() {
   if (state.avatarPendingDataUrl) {
     preview.innerHTML = `<img class="avatar-image" src="${escapeHtml(state.avatarPendingDataUrl)}" alt="" />`;
     preview.classList.add('has-image');
+    preview.classList.remove('avatar-clickable');
+    delete preview.dataset.avatarUser;
+    preview.removeAttribute('title');
   } else {
     setAvatarElement(preview, state.profile, state.profile?.display_name || state.profile?.username || 'K');
+    markAvatarClickable(preview, state.user?.id);
   }
   const removeBtn = $('#removeAvatarBtn');
   if (removeBtn) removeBtn.disabled = !state.avatarPendingDataUrl && !safeAvatarUrl(state.profile?.avatar_url);
@@ -1541,7 +1595,7 @@ function renderConversationList() {
       : '';
     return `<div class="conv-row ${conv.id === state.currentConversationId ? 'active' : ''}">
       <button class="conv-item ${conv.id === state.currentConversationId ? 'active' : ''}" data-conv-id="${conv.id}" type="button">
-        <div class="avatar ${safeAvatarUrl(peerProfile?.avatar_url) ? 'has-image' : ''}">${avatarHtml}</div>
+        <div class="avatar ${safeAvatarUrl(peerProfile?.avatar_url) ? 'has-image avatar-clickable' : ''}" ${otherId ? `data-avatar-user="${escapeHtml(otherId)}" title="Bấm để xem ảnh đại diện"` : ''}>${avatarHtml}</div>
         <div class="conv-main">
           <div class="conv-name-line"><div class="conv-name">${escapeHtml(label)}${online ? ' · 🟢' : ''}</div>${categoryBadge}</div>
           <div class="conv-preview">${escapeHtml(preview?.text || 'Bắt đầu trò chuyện')}</div>
@@ -1587,7 +1641,7 @@ function renderPeopleList() {
     <div class="contact-section">
       <div class="contact-section-title">Lời mời kết bạn <span>${requests.length}</span></div>
       ${requests.map(({ row, profile: p }) => `<div class="person-item request-item">
-        <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image' : ''}">${avatarContent(p, p.display_name)}</div>
+        <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image avatar-clickable' : ''}" data-avatar-user="${escapeHtml(p.user_id)}" ${safeAvatarUrl(p.avatar_url) ? 'title="Bấm để xem ảnh đại diện"' : ''}>${avatarContent(p, p.display_name)}</div>
         <div class="person-info">
           <strong>${escapeHtml(p.display_name)}</strong>
           <small>@${escapeHtml(p.username)}</small>
@@ -1606,7 +1660,7 @@ function renderPeopleList() {
         const display = contactDisplayName(p.user_id);
         const original = p.display_name || p.username;
         return `<div class="person-item">
-          <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image' : ''}">${avatarContent(p, display)}</div>
+          <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image avatar-clickable' : ''}" data-avatar-user="${escapeHtml(p.user_id)}" ${safeAvatarUrl(p.avatar_url) ? 'title="Bấm để xem ảnh đại diện"' : ''}>${avatarContent(p, display)}</div>
           <div class="person-info">
             <strong>${escapeHtml(display)} ${isOnline(p.user_id) ? '🟢' : ''}</strong>
             <small>${display !== original ? `${escapeHtml(original)} · ` : ''}@${escapeHtml(p.username)}</small>
@@ -1620,7 +1674,7 @@ function renderPeopleList() {
     <div class="contact-section">
       <div class="contact-section-title muted-title">Đang chờ đồng ý <span>${outgoing.length}</span></div>
       ${outgoing.map(({ row, profile: p }) => `<div class="person-item pending-item">
-        <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image' : ''}">${avatarContent(p, p.display_name)}</div>
+        <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image avatar-clickable' : ''}" data-avatar-user="${escapeHtml(p.user_id)}" ${safeAvatarUrl(p.avatar_url) ? 'title="Bấm để xem ảnh đại diện"' : ''}>${avatarContent(p, p.display_name)}</div>
         <div class="person-info">
           <strong>${escapeHtml(p.display_name)}</strong>
           <small>@${escapeHtml(p.username)}</small>
@@ -1658,11 +1712,13 @@ function renderChatHeader() {
   $('#videoCallBtn').classList.toggle('hidden', !direct);
   if (conv.kind === 'group') {
     setAvatarElement($('#chatAvatar'), null, title);
+    markAvatarClickable($('#chatAvatar'), null);
     $('#chatSubtitle').textContent = `${memberIds(conv.id).length} thành viên`;
   } else {
     const other = memberIds(conv.id).find((id) => id !== state.user.id);
     const profile = state.profiles.get(other);
     setAvatarElement($('#chatAvatar'), profile, title);
+    markAvatarClickable($('#chatAvatar'), other);
     const original = profile?.display_name || profile?.username || '';
     const onlineText = other && isOnline(other) ? 'Đang online' : 'Riêng tư';
     $('#chatSubtitle').textContent = contactAlias(other) && original
@@ -1747,7 +1803,7 @@ function renderMessages() {
     }
 
     return `<div class="msg-row ${own ? 'own' : 'other'}" data-message-id="${m.id}">
-      ${own ? '' : `<div class="msg-avatar ${safeAvatarUrl(sender?.avatar_url) ? 'has-image' : ''}">${avatarContent(sender, profileName(m.sender_id))}</div>`}
+      ${own ? '' : `<div class="msg-avatar ${safeAvatarUrl(sender?.avatar_url) ? 'has-image avatar-clickable' : ''}" data-avatar-user="${escapeHtml(m.sender_id)}" ${safeAvatarUrl(sender?.avatar_url) ? 'title="Bấm để xem ảnh đại diện"' : ''}>${avatarContent(sender, profileName(m.sender_id))}</div>`}
       <div class="msg-content">
         ${own ? '' : `<div class="msg-sender">${escapeHtml(profileName(m.sender_id))}</div>`}
         <div class="bubble">
@@ -1993,7 +2049,7 @@ function renderGroupFriendsPicker() {
     return `<div class="picker-row">
       <label>
         <input type="checkbox" data-pick-friend value="${p.user_id}" ${p.public_key ? '' : 'disabled'} />
-        <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image' : ''}">${avatarContent(p, display)}</div>
+        <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image avatar-clickable' : ''}" data-avatar-user="${escapeHtml(p.user_id)}" ${safeAvatarUrl(p.avatar_url) ? 'title="Bấm để xem ảnh đại diện"' : ''}>${avatarContent(p, display)}</div>
         <span><strong>${escapeHtml(display)}</strong><br><small>@${escapeHtml(p.username)}${p.public_key ? '' : ' · cần mở Kalo trước'}</small></span>
       </label>
     </div>`;
@@ -2917,7 +2973,32 @@ function bindAppEvents() {
   $('#privacyBtn').addEventListener('click', () => applyPrivacy(!document.body.classList.contains('privacy-mode')));
   $('#privacyToggle').addEventListener('change', (event) => applyPrivacy(event.target.checked));
 
-  $('#selfAvatarBtn').addEventListener('click', () => $('#settingsBtn').click());
+  $('#selfAvatarBtn').addEventListener('click', (event) => {
+    event.preventDefault();
+    openAvatarViewer(state.user?.id);
+  });
+
+  document.addEventListener('click', (event) => {
+    const avatar = event.target.closest('[data-avatar-user].avatar-clickable');
+    if (!avatar) return;
+    if (avatar.closest('#selfAvatarBtn')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openAvatarViewer(avatar.dataset.avatarUser);
+  }, true);
+
+  document.addEventListener('keydown', (event) => {
+    if (!['Enter', ' '].includes(event.key)) return;
+    const avatar = event.target.closest?.('[data-avatar-user].avatar-clickable');
+    if (!avatar || avatar.closest('#selfAvatarBtn')) return;
+    event.preventDefault();
+    openAvatarViewer(avatar.dataset.avatarUser);
+  });
+
+  $('#closeAvatarViewerBtn').addEventListener('click', closeAvatarViewer);
+  $('#avatarViewerModal').addEventListener('click', (event) => {
+    if (event.target === $('#avatarViewerModal')) closeAvatarViewer();
+  });
 
   $('#settingsBtn').addEventListener('click', () => {
     $('#settingsAccount').textContent = `@${state.profile?.username || ''}`;
@@ -3109,6 +3190,11 @@ function bindAppEvents() {
     }
     if (event.key === 'Escape') {
       if (!$('#callModal').classList.contains('hidden')) return;
+      if (!$('#avatarViewerModal').classList.contains('hidden')) {
+        event.preventDefault();
+        closeAvatarViewer();
+        return;
+      }
       if (!$('#avatarCropModal').classList.contains('hidden')) {
         event.preventDefault();
         cancelAvatarCrop();
