@@ -137,6 +137,23 @@ function formatTime(value) {
   }
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 }
+function notifyParentOfIncomingMessage(row) {
+  if (!row || !state.user || row.sender_id === state.user.id) return;
+  const conv = state.conversations.find((item) => item.id === row.conversation_id) || null;
+  const senderName = profileName(row.sender_id);
+  const conversationName = conv ? conversationLabel(conv) : 'Kalo';
+  window.parent?.postMessage?.({
+    source: 'kalo',
+    type: 'new-message',
+    messageId: row.id,
+    conversationId: row.conversation_id,
+    senderId: row.sender_id,
+    senderName,
+    conversationName,
+    createdAt: row.created_at || new Date().toISOString(),
+  }, '*');
+}
+
 function toast(message, type = '') {
   const host = $('#toastHost');
   const item = document.createElement('div');
@@ -1055,6 +1072,7 @@ async function startRealtime() {
       if (!state.conversations.some((c) => c.id === row.conversation_id)) {
         await loadConversations();
       }
+      notifyParentOfIncomingMessage(row);
       if (row.conversation_id === state.currentConversationId) {
         await loadMessages(row.conversation_id);
       } else {
