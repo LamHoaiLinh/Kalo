@@ -85,6 +85,10 @@ const requiredIds = [
   'scrollToLatestBtn',
   'selfAvatarBtn',
   'selfAvatar',
+  'avatarViewerModal',
+  'avatarViewerImage',
+  'avatarViewerName',
+  'closeAvatarViewerBtn',
 ];
 
 for (const id of requiredIds) {
@@ -117,6 +121,9 @@ if (!app.includes("scrollMessagesToLatest(")) throw new Error('Jump-to-latest me
 if (!app.includes("updateScrollToLatestButton(")) throw new Error('Jump-to-latest visibility flow is missing');
 if (!app.includes("function updateSelfAvatar(")) throw new Error('Own rail avatar update flow is missing');
 if (!app.includes("table: 'kalo_profiles'")) throw new Error('Realtime profile/avatar sync is missing');
+if (!app.includes("function openAvatarViewer(")) throw new Error('Full avatar viewer flow is missing');
+if (!app.includes("data-avatar-user")) throw new Error('Clickable friend avatar bindings are missing');
+if (!css.includes("Full avatar viewer")) throw new Error('Full avatar viewer styling is missing');
 if (!css.includes("#avatarCropModal")) throw new Error('Avatar crop priority styling is missing');
 if (!app.includes("contactAliasStorageKey(")) throw new Error('Private contact nickname storage is missing');
 if (!app.includes("openContactAliasModal(")) throw new Error('Contact nickname UI flow is missing');
