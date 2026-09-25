@@ -44,6 +44,11 @@ const requiredIds = [
   'callModal',
   'remoteCallVideo',
   'localCallVideo',
+  'messageSearchBtn',
+  'messageSearchPanel',
+  'messageSearchText',
+  'messageSearchDate',
+  'messageSearchResults',
 ];
 
 for (const id of requiredIds) {
@@ -56,5 +61,9 @@ if (!app.includes("from('kalo_friendships')")) throw new Error('Friendship backe
 if (!app.includes("new KaloDocuments(")) throw new Error('My Documents manager is missing');
 if (!app.includes("new KaloCallManager(")) throw new Error('Call manager is missing');
 if (!app.includes("createReceiveTarget:")) throw new Error('Received files are not routed to My Documents');
+if (!app.includes("sendMyDocumentText(")) throw new Error('My Documents self-chat text flow is missing');
+if (!app.includes("sendMyDocumentFile(")) throw new Error('My Documents self-chat file flow is missing');
+if (!app.includes("fetchConversationMessagesForSearch(")) throw new Error('Message search flow is missing');
+if (!app.includes("addEventListener('paste'")) throw new Error('Paste-to-chat binding is missing');
 
 console.log('Kalo DOM binding smoke test passed.');
