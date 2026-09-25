@@ -173,7 +173,7 @@ function modalOpen() {
   return $$('.modal-backdrop:not(.hidden)').length > 0;
 }
 function closeTopModal() {
-  const open = $('.modal-backdrop:not(.hidden)');
+  const open = $$('.modal-backdrop:not(.hidden)');
   if (!open.length) return false;
   const top = open[open.length - 1];
   if (top.id === 'addFriendModal') stopQrScanner();
@@ -1074,7 +1074,7 @@ async function toggleHeart(messageId) {
 
 function setView(view) {
   state.currentView = view;
-  $('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   const search = $('#conversationSearch');
   if (view === 'people') {
     $('#leftPaneTitle').textContent = 'Bạn bè';
@@ -1217,7 +1217,7 @@ function showEmailPasswordRecoveryDialog() {
 
 async function initAuth() {
   initRememberLoginPreference();
-  $('.auth-tab').forEach((btn) => btn.addEventListener('click', () => switchAuthTab(btn.dataset.authTab)));
+  $$('.auth-tab').forEach((btn) => btn.addEventListener('click', () => switchAuthTab(btn.dataset.authTab)));
 
   $('#loginForm').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -1348,7 +1348,7 @@ function bindAppEvents() {
     createGroupFromPicker().catch((e) => toast(e.message, 'error'));
   });
 
-  $('.friend-tab').forEach((btn) => btn.addEventListener('click', () => switchFriendTab(btn.dataset.friendTab)));
+  $$('.friend-tab').forEach((btn) => btn.addEventListener('click', () => switchFriendTab(btn.dataset.friendTab)));
   $('#startQrBtn').addEventListener('click', async () => {
     const button = $('#startQrBtn');
     setBusy(button, true, 'Đang mở...');
@@ -1397,7 +1397,7 @@ function bindAppEvents() {
     } catch {}
   });
 
-  $('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => {
     const id = btn.dataset.closeModal;
     if (id === 'addFriendModal') stopQrScanner();
     hide(`#${id}`);
