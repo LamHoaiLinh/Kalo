@@ -34,6 +34,8 @@ jobs:
           node --check web/config.js
           node --check web/crypto.js
           node --check web/webrtc.js
+          node --check web/storage.js
+          node --check web/call.js
           node --check web/app.js
           node --check web/sw.js
 
@@ -46,12 +48,16 @@ jobs:
           test -s web/app.js
           test -s web/crypto.js
           test -s web/webrtc.js
+          test -s web/storage.js
+          test -s web/call.js
           grep -q 'Kalo' web/index.html
           grep -q 'Tạo tài khoản' web/index.html
           grep -q 'Quên mật khẩu' web/index.html
           grep -q 'kalo-auth' web/config.js
           grep -q 'kalo_messages' web/app.js
           grep -q 'RTCPeerConnection' web/webrtc.js
+          grep -q 'RTCPeerConnection' web/call.js
+          grep -q 'showDirectoryPicker' web/storage.js
           if grep -RniE 'matrix\.org|Homeserver|Continue with SSO|Powered by Matrix' web; then
             echo "Matrix-facing text must not exist in native Kalo web."
             exit 1
