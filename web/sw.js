@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v13-avatars-nicknames';
+const CACHE='kalo-native-v14-manual-avatar-crop';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.6.0',
-  './app.js?v=1.6.0',
+  './styles.css?v=1.6.1',
+  './app.js?v=1.6.1',
   './config.js',
   './crypto.js',
   './webrtc.js',
