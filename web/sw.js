@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v11-kanban-notifications';
+const CACHE='kalo-native-v12-fixed-composer-privacy-shortcut';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.5.1',
-  './app.js?v=1.5.2',
+  './styles.css?v=1.5.3',
+  './app.js?v=1.5.3',
   './config.js',
   './crypto.js',
   './webrtc.js',
