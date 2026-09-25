@@ -82,6 +82,8 @@ if (!app.includes("openConversationCategoryMenu(")) throw new Error('Conversatio
 if (!app.includes("renderCategoryFilterMenu(")) throw new Error('Conversation category filter UI is missing');
 if (!app.includes("createConversationCategory(")) throw new Error('Conversation category manager is missing');
 if (!app.includes("notifyParentOfIncomingMessage(")) throw new Error('Kanban incoming-message notification bridge is missing');
+if (!app.includes("event.code === 'Period'")) throw new Error('Alt period privacy shortcut is missing');
+if (!css.includes("Keep composer visible in long chats")) throw new Error('Long-chat composer layout fix is missing');
 if (!html.includes('logout-icon-img')) throw new Error('Custom logout icon is missing');
 if (!app.includes("function returnToKanban(")) throw new Error('Standalone return-to-Kanban action is missing');
 if (!html.includes('id="imageBtn"') || !html.includes('compose-tool-image')) throw new Error('Custom image composer icon is missing');
