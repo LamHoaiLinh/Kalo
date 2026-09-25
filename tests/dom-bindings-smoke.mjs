@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const app = fs.readFileSync(new URL('../web/app.js', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../web/styles.css', import.meta.url), 'utf8');
 
 const badPatterns = [
   /\n\s*\$\('\.rail-btn\[data-view\]'\)\.forEach/,
