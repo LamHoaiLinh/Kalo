@@ -89,6 +89,7 @@ const requiredIds = [
   'avatarViewerImage',
   'avatarViewerName',
   'closeAvatarViewerBtn',
+  'avatarViewerZoomValue',
 ];
 
 for (const id of requiredIds) {
@@ -122,6 +123,9 @@ if (!app.includes("updateScrollToLatestButton(")) throw new Error('Jump-to-lates
 if (!app.includes("function updateSelfAvatar(")) throw new Error('Own rail avatar update flow is missing');
 if (!app.includes("table: 'kalo_profiles'")) throw new Error('Realtime profile/avatar sync is missing');
 if (!app.includes("function openAvatarViewer(")) throw new Error('Full avatar viewer flow is missing');
+if (!app.includes("function applyAvatarViewerZoom(")) throw new Error('Avatar wheel zoom flow is missing');
+if (!app.includes("addEventListener('wheel'")) throw new Error('Avatar wheel listener is missing');
+if (!app.includes("closeAvatarViewer();")) throw new Error('Avatar viewer close flow is missing');
 if (!app.includes("data-avatar-user")) throw new Error('Clickable friend avatar bindings are missing');
 if (!css.includes("Full avatar viewer")) throw new Error('Full avatar viewer styling is missing');
 if (!css.includes("#avatarCropModal")) throw new Error('Avatar crop priority styling is missing');
