@@ -58,6 +58,9 @@ jobs:
           fi
           echo "Kalo native static checks passed."
 
+      - name: DOM startup smoke test
+        run: node tests/dom-bindings-smoke.mjs
+
       - name: E2EE roundtrip smoke test
         run: node tests/crypto-smoke.mjs
 
