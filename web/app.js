@@ -12,6 +12,7 @@ import {
   decryptPayload,
 } from './crypto.js';
 import { KaloFileTransfer } from './webrtc.js';
+import QrScanner from './vendor/qr-scanner.min.js';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
@@ -31,6 +32,7 @@ const state = {
   profile: null,
   identity: null,
   profiles: new Map(),
+  friendships: [],
   conversations: [],
   members: new Map(),
   currentConversationId: null,
@@ -45,6 +47,7 @@ const state = {
   startedUserId: null,
   pendingRecoveryCode: null,
   currentView: 'chats',
+  qrScanner: null,
 };
 
 function show(el) {
@@ -130,9 +133,11 @@ function modalOpen() {
   return $$('.modal-backdrop:not(.hidden)').length > 0;
 }
 function closeTopModal() {
-  const open = $$('.modal-backdrop:not(.hidden)');
+  const open = $('.modal-backdrop:not(.hidden)');
   if (!open.length) return false;
-  open[open.length - 1].classList.add('hidden');
+  const top = open[open.length - 1];
+  if (top.id === 'addFriendModal') stopQrScanner();
+  top.classList.add('hidden');
   return true;
 }
 
@@ -158,6 +163,38 @@ function conversationAvatar(conv) {
 function isOnline(userId) {
   return state.presence.has(userId);
 }
+function acceptedFriendIds() {
+  const ids = new Set();
+  for (const row of state.friendships) {
+    if (row.status !== 'accepted') continue;
+    ids.add(row.requester_id === state.user?.id ? row.addressee_id : row.requester_id);
+  }
+  return ids;
+}
+function isFriend(userId) {
+  return acceptedFriendIds().has(userId);
+}
+function friendRowWith(userId) {
+  return state.friendships.find((row) =>
+    (row.requester_id === state.user?.id && row.addressee_id === userId) ||
+    (row.addressee_id === state.user?.id && row.requester_id === userId)
+  ) || null;
+}
+function incomingFriendRequests() {
+  return state.friendships.filter((row) =>
+    row.status === 'pending' && row.addressee_id === state.user?.id
+  );
+}
+function outgoingFriendRequests() {
+  return state.friendships.filter((row) =>
+    row.status === 'pending' && row.requester_id === state.user?.id
+  );
+}
+function friendProfileFromRow(row) {
+  const otherId = row.requester_id === state.user?.id ? row.addressee_id : row.requester_id;
+  return state.profiles.get(otherId) || null;
+}
+
 
 async function setSessionFromResponse(session) {
   if (!session?.access_token || !session?.refresh_token) throw new Error('Phiên đăng nhập không hợp lệ.');
@@ -317,6 +354,12 @@ async function startRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_reactions' }, async () => {
       if (state.currentConversationId) await loadReactions();
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_friendships' }, async () => {
+      await loadFriendships();
+      renderPeopleList();
+      renderConversationList();
+      renderOnlineSummary();
+    })
     .subscribe();
   state.realtimeChannels.push(dataChannel);
 
@@ -333,6 +376,16 @@ async function loadProfiles() {
   state.profiles = new Map((data || []).map((p) => [p.user_id, p]));
   state.profile = state.profiles.get(state.user.id) || state.profile;
 }
+
+async function loadFriendships() {
+  const { data, error } = await supabase
+    .from('kalo_friendships')
+    .select('id,requester_id,addressee_id,status,created_at,accepted_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  state.friendships = data || [];
+}
+
 
 async function loadConversations() {
   const [{ data: convs, error: convError }, { data: members, error: memberError }] = await Promise.all([
@@ -437,8 +490,14 @@ async function loadReactions() {
 }
 
 function renderOnlineSummary() {
-  const count = [...state.presence].filter((id) => id !== state.user?.id).length;
-  $('#onlineSummary').textContent = count > 0 ? `${count} người đang online` : 'Kalo đã sẵn sàng';
+  const friends = acceptedFriendIds();
+  const count = [...state.presence].filter((id) => friends.has(id)).length;
+  const pending = incomingFriendRequests().length;
+  if (state.currentView === 'people' && pending > 0) {
+    $('#onlineSummary').textContent = `${pending} lời mời kết bạn`;
+    return;
+  }
+  $('#onlineSummary').textContent = count > 0 ? `${count} bạn đang online` : 'Kalo đã sẵn sàng';
 }
 
 function renderConversationList() {
@@ -473,19 +532,79 @@ function renderConversationList() {
 
 function renderPeopleList() {
   const root = $('#peopleList');
+  if (!root || !state.user) return;
   const query = ($('#conversationSearch')?.value || '').trim().toLowerCase();
-  const people = [...state.profiles.values()]
-    .filter((p) => p.user_id !== state.user.id)
-    .filter((p) => !query || p.display_name.toLowerCase().includes(query) || p.username.includes(query));
-  root.innerHTML = people.map((p) => `<div class="person-item">
-    <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
-    <div class="person-info">
-      <strong>${escapeHtml(p.display_name)} ${isOnline(p.user_id) ? '🟢' : ''}</strong>
-      <small>@${escapeHtml(p.username)}${p.public_key ? '' : ' · chưa mở Kalo lần đầu'}</small>
-    </div>
-    <button data-message-user="${p.user_id}" type="button">Nhắn tin</button>
-  </div>`).join('') || '<div class="empty-chat" style="padding:32px 10px"><p>Không tìm thấy người dùng.</p></div>';
-  $$('[data-message-user]', root).forEach((btn) => btn.addEventListener('click', () => createOrOpenDirect(btn.dataset.messageUser)));
+
+  const requests = incomingFriendRequests()
+    .map((row) => ({ row, profile: friendProfileFromRow(row) }))
+    .filter((x) => x.profile);
+
+  const outgoing = outgoingFriendRequests()
+    .map((row) => ({ row, profile: friendProfileFromRow(row) }))
+    .filter((x) => x.profile);
+
+  const friends = [...acceptedFriendIds()]
+    .map((id) => state.profiles.get(id))
+    .filter(Boolean)
+    .filter((p) => !query || p.display_name.toLowerCase().includes(query) || p.username.includes(query))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, 'vi'));
+
+  const requestHtml = requests.length ? `
+    <div class="contact-section">
+      <div class="contact-section-title">Lời mời kết bạn <span>${requests.length}</span></div>
+      ${requests.map(({ row, profile: p }) => `<div class="person-item request-item">
+        <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
+        <div class="person-info">
+          <strong>${escapeHtml(p.display_name)}</strong>
+          <small>@${escapeHtml(p.username)}</small>
+        </div>
+        <div class="friend-actions">
+          <button class="accept-btn" data-accept-friend="${row.id}" type="button">Đồng ý</button>
+          <button class="decline-btn" data-decline-friend="${row.id}" type="button">Bỏ qua</button>
+        </div>
+      </div>`).join('')}
+    </div>` : '';
+
+  const friendHtml = `
+    <div class="contact-section">
+      <div class="contact-section-title">Bạn bè <span>${friends.length}</span></div>
+      ${friends.map((p) => `<div class="person-item">
+        <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
+        <div class="person-info">
+          <strong>${escapeHtml(p.display_name)} ${isOnline(p.user_id) ? '🟢' : ''}</strong>
+          <small>@${escapeHtml(p.username)}</small>
+        </div>
+        <button data-message-user="${p.user_id}" type="button">Nhắn tin</button>
+      </div>`).join('') || '<div class="contact-empty">Chưa có bạn bè. Bấm “Thêm bạn” để bắt đầu.</div>'}
+    </div>`;
+
+  const outgoingHtml = outgoing.length ? `
+    <div class="contact-section">
+      <div class="contact-section-title muted-title">Đang chờ đồng ý <span>${outgoing.length}</span></div>
+      ${outgoing.map(({ row, profile: p }) => `<div class="person-item pending-item">
+        <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
+        <div class="person-info">
+          <strong>${escapeHtml(p.display_name)}</strong>
+          <small>@${escapeHtml(p.username)}</small>
+        </div>
+        <button class="decline-btn" data-cancel-friend="${row.id}" type="button">Hủy</button>
+      </div>`).join('')}
+    </div>` : '';
+
+  root.innerHTML = requestHtml + friendHtml + outgoingHtml;
+
+  $$('[data-message-user]', root).forEach((btn) => btn.addEventListener('click', () => {
+    createOrOpenDirect(btn.dataset.messageUser).catch((e) => toast(e.message, 'error'));
+  }));
+  $$('[data-accept-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
+    acceptFriendRequest(btn.dataset.acceptFriend).catch((e) => toast(e.message, 'error'));
+  }));
+  $$('[data-decline-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
+    removeFriendship(btn.dataset.declineFriend, 'Đã bỏ qua lời mời.').catch((e) => toast(e.message, 'error'));
+  }));
+  $$('[data-cancel-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
+    removeFriendship(btn.dataset.cancelFriend, 'Đã hủy lời mời.').catch((e) => toast(e.message, 'error'));
+  }));
 }
 
 function renderChatHeader() {
@@ -561,6 +680,9 @@ async function openConversation(id) {
 }
 
 async function createOrOpenDirect(userId) {
+  if (!isFriend(userId)) {
+    throw new Error('Bạn cần kết bạn trước khi nhắn tin.');
+  }
   const existing = state.conversations.find((c) => {
     if (c.kind !== 'direct') return false;
     const ids = memberIds(c.id);
@@ -589,28 +711,208 @@ async function createOrOpenDirect(userId) {
   return state.conversations.find((c) => c.id === id);
 }
 
-async function createConversationFromPicker() {
-  const selected = $$('[data-pick-user]:checked', $('#newChatPeople')).map((x) => x.value);
-  if (!selected.length) {
-    toast('Hãy chọn ít nhất một người.', 'error');
-    return;
+async function acceptFriendRequest(friendshipId) {
+  const { error } = await supabase
+    .from('kalo_friendships')
+    .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+    .eq('id', friendshipId);
+  if (error) throw error;
+  await loadFriendships();
+  renderPeopleList();
+  renderOnlineSummary();
+  toast('Đã kết bạn.');
+}
+
+async function removeFriendship(friendshipId, message = 'Đã cập nhật.') {
+  const { error } = await supabase.from('kalo_friendships').delete().eq('id', friendshipId);
+  if (error) throw error;
+  await loadFriendships();
+  renderPeopleList();
+  renderOnlineSummary();
+  toast(message);
+}
+
+function normalizeFriendUsername(value) {
+  let raw = String(value || '').trim();
+  try {
+    const url = new URL(raw);
+    const fromQuery = url.searchParams.get('friend');
+    if (fromQuery) raw = fromQuery;
+  } catch {}
+  raw = raw.replace(/^@/, '').trim().toLowerCase();
+  if (raw.startsWith('kalo:friend:')) raw = raw.slice('kalo:friend:'.length);
+  return raw.replace(/^@/, '').trim().toLowerCase();
+}
+
+async function sendFriendRequestByUsername(value) {
+  const username = normalizeFriendUsername(value);
+  if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+    throw new Error('ID Kalo không hợp lệ.');
   }
-  const missingKey = selected.map((id) => state.profiles.get(id)).find((p) => !p?.public_key);
-  if (missingKey) {
-    toast(`${missingKey.display_name} cần mở Kalo ít nhất một lần trước khi nhận tin riêng tư.`, 'error');
-    return;
+  const target = [...state.profiles.values()].find((p) => p.username === username);
+  if (!target) throw new Error('Không tìm thấy ID Kalo này.');
+  if (target.user_id === state.user.id) throw new Error('Đây là ID của bạn.');
+
+  const existing = friendRowWith(target.user_id);
+  if (existing?.status === 'accepted') {
+    toast('Hai bạn đã là bạn bè.');
+    return { status: 'accepted', target };
   }
-  if (selected.length === 1) {
-    hide('#newChatModal');
-    await createOrOpenDirect(selected[0]);
-    return;
+  if (existing?.status === 'pending') {
+    if (existing.addressee_id === state.user.id) {
+      await acceptFriendRequest(existing.id);
+      return { status: 'accepted', target };
+    }
+    toast('Lời mời đã được gửi trước đó.');
+    return { status: 'pending', target };
   }
 
-  const title = $('#groupNameInput').value.trim();
-  if (!title) {
-    toast('Vui lòng đặt tên nhóm.', 'error');
+  const { error } = await supabase.from('kalo_friendships').insert({
+    requester_id: state.user.id,
+    addressee_id: target.user_id,
+    status: 'pending',
+  });
+  if (error) throw error;
+  await loadFriendships();
+  renderPeopleList();
+  renderOnlineSummary();
+  toast(`Đã gửi lời mời kết bạn tới ${target.display_name}.`);
+  return { status: 'pending', target };
+}
+
+function friendLink(username = state.profile?.username) {
+  return `${location.origin}${location.pathname}?friend=${encodeURIComponent(username || '')}`;
+}
+
+function renderMyQr() {
+  const root = $('#myQrCode');
+  if (!root || !state.profile || !window.QRCode) return;
+  root.innerHTML = '';
+  new window.QRCode(root, {
+    text: friendLink(state.profile.username),
+    width: 220,
+    height: 220,
+    colorDark: '#173b2d',
+    colorLight: '#ffffff',
+    correctLevel: window.QRCode.CorrectLevel.M,
+  });
+  $('#myQrName').textContent = state.profile.display_name;
+  $('#myQrId').textContent = `@${state.profile.username}`;
+}
+
+async function stopQrScanner() {
+  if (!state.qrScanner) return;
+  try {
+    state.qrScanner.stop();
+    state.qrScanner.destroy();
+  } catch {}
+  state.qrScanner = null;
+  const video = $('#qrVideo');
+  if (video) video.srcObject = null;
+}
+
+async function handleQrPayload(raw) {
+  const username = normalizeFriendUsername(raw);
+  if (!username) throw new Error('Mã QR này không phải mã kết bạn Kalo.');
+  await stopQrScanner();
+  $('#friendIdInput').value = username;
+  await sendFriendRequestByUsername(username);
+  hide('#addFriendModal');
+  setView('people');
+}
+
+async function startQrScanner() {
+  await stopQrScanner();
+  const video = $('#qrVideo');
+  const hint = $('#qrCameraHint');
+  hint.textContent = 'Đang mở camera...';
+  const hasCamera = await QrScanner.hasCamera();
+  if (!hasCamera) throw new Error('Thiết bị không có camera khả dụng.');
+
+  state.qrScanner = new QrScanner(
+    video,
+    (result) => {
+      handleQrPayload(result.data).catch((e) => {
+        toast(e.message || 'Không đọc được mã QR.', 'error');
+        openAddFriendModal('scan');
+      });
+    },
+    {
+      preferredCamera: 'environment',
+      highlightScanRegion: true,
+      highlightCodeOutline: true,
+      returnDetailedScanResult: true,
+      maxScansPerSecond: 10,
+    }
+  );
+  await state.qrScanner.start();
+  hint.textContent = 'Đưa mã QR vào giữa khung.';
+}
+
+function switchFriendTab(tab) {
+  $$('.friend-tab').forEach((btn) => btn.classList.toggle('active', btn.dataset.friendTab === tab));
+  $$('[data-friend-panel]').forEach((panel) => panel.classList.toggle('hidden', panel.dataset.friendPanel !== tab));
+  if (tab !== 'scan') stopQrScanner();
+  if (tab === 'mine') renderMyQr();
+}
+
+function openAddFriendModal(tab = 'scan') {
+  switchFriendTab(tab);
+  show('#addFriendModal');
+  if (tab === 'id') setTimeout(() => $('#friendIdInput')?.focus(), 50);
+}
+
+function friendProfiles() {
+  return [...acceptedFriendIds()]
+    .map((id) => state.profiles.get(id))
+    .filter(Boolean)
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, 'vi'));
+}
+
+function renderGroupFriendsPicker() {
+  const q = ($('#groupPeopleSearch')?.value || '').trim().toLowerCase();
+  const root = $('#groupFriendsPicker');
+  const friends = friendProfiles()
+    .filter((p) => !q || p.display_name.toLowerCase().includes(q) || p.username.includes(q));
+
+  root.innerHTML = friends.map((p) => `<div class="picker-row">
+    <label>
+      <input type="checkbox" data-pick-friend value="${p.user_id}" ${p.public_key ? '' : 'disabled'} />
+      <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
+      <span><strong>${escapeHtml(p.display_name)}</strong><br><small>@${escapeHtml(p.username)}${p.public_key ? '' : ' · cần mở Kalo trước'}</small></span>
+    </label>
+  </div>`).join('') || '<div class="contact-empty">Chưa có bạn bè phù hợp để thêm vào nhóm.</div>';
+}
+
+function openGroupModal() {
+  const friends = friendProfiles();
+  if (!friends.length) {
+    toast('Bạn chưa có bạn bè. Hãy thêm bạn trước khi tạo nhóm.', 'error');
+    setView('people');
+    openAddFriendModal('scan');
     return;
   }
+  $('#groupNameInput').value = '';
+  $('#groupPeopleSearch').value = '';
+  renderGroupFriendsPicker();
+  show('#groupModal');
+  setTimeout(() => $('#groupNameInput')?.focus(), 50);
+}
+
+async function createGroupFromPicker() {
+  const selected = $$('[data-pick-friend]:checked', $('#groupFriendsPicker')).map((x) => x.value);
+  const title = $('#groupNameInput').value.trim();
+  if (!title) throw new Error('Vui lòng đặt tên nhóm.');
+  if (!selected.length) throw new Error('Hãy chọn ít nhất một người bạn.');
+
+  const notFriend = selected.find((id) => !isFriend(id));
+  if (notFriend) throw new Error('Danh sách nhóm chỉ được chọn từ bạn bè.');
+
+  const missingKey = selected.map((id) => state.profiles.get(id)).find((p) => !p?.public_key);
+  if (missingKey) {
+    throw new Error(`${missingKey.display_name} cần mở Kalo ít nhất một lần trước khi vào nhóm.`);
+  }
+
   const id = crypto.randomUUID();
   const { error } = await supabase.from('kalo_conversations').insert({
     id,
@@ -619,30 +921,18 @@ async function createConversationFromPicker() {
     created_by: state.user.id,
   });
   if (error) throw error;
+
   const rows = [
     { conversation_id: id, user_id: state.user.id, role: 'owner' },
     ...selected.map((userId) => ({ conversation_id: id, user_id: userId, role: 'member' })),
   ];
   const { error: memberError } = await supabase.from('kalo_conversation_members').insert(rows);
   if (memberError) throw memberError;
-  hide('#newChatModal');
+
+  hide('#groupModal');
   await loadConversations();
   await openConversation(id);
-}
-
-function renderPeoplePicker() {
-  const q = ($('#peopleSearch').value || '').trim().toLowerCase();
-  const root = $('#newChatPeople');
-  const people = [...state.profiles.values()]
-    .filter((p) => p.user_id !== state.user.id)
-    .filter((p) => !q || p.display_name.toLowerCase().includes(q) || p.username.includes(q));
-  root.innerHTML = people.map((p) => `<div class="picker-row">
-    <label>
-      <input type="checkbox" data-pick-user value="${p.user_id}" ${p.public_key ? '' : 'disabled'} />
-      <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
-      <span><strong>${escapeHtml(p.display_name)}</strong><br><small>@${escapeHtml(p.username)}${p.public_key ? '' : ' · chưa sẵn sàng'}</small></span>
-    </label>
-  </div>`).join('');
+  toast('Đã tạo nhóm.');
 }
 
 async function sendMessage() {
@@ -744,18 +1034,26 @@ async function toggleHeart(messageId) {
 
 function setView(view) {
   state.currentView = view;
-  $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  $('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  const search = $('#conversationSearch');
   if (view === 'people') {
-    $('#leftPaneTitle').textContent = 'Danh bạ';
+    $('#leftPaneTitle').textContent = 'Bạn bè';
+    search.placeholder = 'Tìm bạn bè...';
+    show('#addFriendBtn');
+    hide('#createGroupBtn');
     hide('#conversationList');
     show('#peopleList');
     renderPeopleList();
   } else {
     $('#leftPaneTitle').textContent = 'Tin nhắn';
+    search.placeholder = 'Tìm cuộc trò chuyện...';
+    hide('#addFriendBtn');
+    show('#createGroupBtn');
     show('#conversationList');
     hide('#peopleList');
     renderConversationList();
   }
+  renderOnlineSummary();
 }
 
 function applyPrivacy(value) {
@@ -792,7 +1090,8 @@ async function startApp(session) {
     state.identity = await ensureUserIdentity(state.pendingRecoveryCode);
     state.pendingRecoveryCode = null;
 
-    await Promise.all([loadProfiles(), loadConversations()]);
+    await loadProfiles();
+    await Promise.all([loadFriendships(), loadConversations()]);
     await startRealtime();
 
     hide('#authScreen');
@@ -803,6 +1102,13 @@ async function startApp(session) {
     setView('chats');
     renderOnlineSummary();
     state.startedUserId = session.user.id;
+    const friendParam = new URLSearchParams(location.search).get('friend');
+    if (friendParam && normalizeFriendUsername(friendParam) !== state.profile.username) {
+      setView('people');
+      $('#friendIdInput').value = normalizeFriendUsername(friendParam);
+      openAddFriendModal('id');
+      history.replaceState({}, '', location.pathname);
+    }
     window.parent?.postMessage?.({ source: 'kalo', type: 'ready' }, '*');
   } catch (e) {
     console.error(e);
@@ -823,6 +1129,7 @@ async function logout() {
   state.identity = null;
   state.startedUserId = null;
   state.profiles.clear();
+  state.friendships = [];
   state.conversations = [];
   state.members.clear();
   state.messages = [];
@@ -991,16 +1298,67 @@ function bindAppEvents() {
     else renderConversationList();
   });
 
-  $('#newChatBtn').addEventListener('click', () => {
-    $('#groupNameInput').value = '';
-    $('#peopleSearch').value = '';
-    renderPeoplePicker();
-    show('#newChatModal');
+  $('#addFriendBtn').addEventListener('click', () => openAddFriendModal('scan'));
+  $('#createGroupBtn').addEventListener('click', openGroupModal);
+  $('#groupPeopleSearch').addEventListener('input', renderGroupFriendsPicker);
+  $('#createGroupSubmitBtn').addEventListener('click', () => {
+    createGroupFromPicker().catch((e) => toast(e.message, 'error'));
   });
-  $('#peopleSearch').addEventListener('input', renderPeoplePicker);
-  $('#createChatBtn').addEventListener('click', () => createConversationFromPicker().catch((e) => toast(e.message, 'error')));
 
-  $$('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => hide(`#${btn.dataset.closeModal}`)));
+  $('.friend-tab').forEach((btn) => btn.addEventListener('click', () => switchFriendTab(btn.dataset.friendTab)));
+  $('#startQrBtn').addEventListener('click', async () => {
+    const button = $('#startQrBtn');
+    setBusy(button, true, 'Đang mở...');
+    try {
+      await startQrScanner();
+    } catch (e) {
+      toast(e.message || 'Không mở được camera.', 'error');
+    } finally {
+      setBusy(button, false);
+    }
+  });
+  $('#qrImageInput').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const result = await QrScanner.scanImage(file, { returnDetailedScanResult: true });
+      await handleQrPayload(result.data);
+    } catch (e) {
+      toast('Không đọc được mã QR trong ảnh này.', 'error');
+    }
+  });
+  $('#addFriendIdForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = $('button[type="submit"]', event.currentTarget);
+    setBusy(button, true);
+    try {
+      await sendFriendRequestByUsername($('#friendIdInput').value);
+      hide('#addFriendModal');
+      setView('people');
+    } catch (e) {
+      toast(e.message || 'Không thêm được bạn.', 'error');
+    } finally {
+      setBusy(button, false);
+    }
+  });
+  $('#shareQrBtn').addEventListener('click', async () => {
+    const url = friendLink();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Kết bạn Kalo', text: `Kết bạn với ${state.profile.display_name} trên Kalo`, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast('Đã sao chép liên kết kết bạn.');
+      }
+    } catch {}
+  });
+
+  $('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => {
+    const id = btn.dataset.closeModal;
+    if (id === 'addFriendModal') stopQrScanner();
+    hide(`#${id}`);
+  }));
 
   $('#sendBtn').addEventListener('click', sendMessage);
   $('#messageInput').addEventListener('keydown', (event) => {
@@ -1097,6 +1455,7 @@ function bindAppEvents() {
 
   window.addEventListener('beforeunload', () => {
     try { state.fileManager?.stop(); } catch {}
+    try { state.qrScanner?.stop(); } catch {}
   });
 }
 
