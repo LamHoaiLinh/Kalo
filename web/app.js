@@ -441,7 +441,9 @@ async function chooseStorageFolder() {
     await refreshStorageUi();
     await loadDocuments();
     toast(result.mode === 'folder'
-      ? `Đã chuyển My Documents sang thư mục “${result.label}”.`
+      ? (result.moved > 0
+          ? `Đã chuyển ${result.moved} file sang thư mục “${result.label}”.`
+          : `Đã chuyển My Documents sang thư mục “${result.label}”.`)
       : 'Thiết bị này dùng bộ nhớ Kalo cục bộ.');
   } catch (e) {
     if (e?.name !== 'AbortError') toast(e.message || 'Không đổi được vị trí lưu trữ.', 'error');
