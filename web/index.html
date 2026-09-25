@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.5.3" />
+  <link rel="stylesheet" href="./styles.css?v=1.6.0" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -159,7 +159,10 @@
         <header class="chat-header">
           <div class="avatar" id="chatAvatar">K</div>
           <div class="chat-title">
-            <strong id="chatTitle">Kalo</strong>
+            <div class="chat-title-line">
+              <strong id="chatTitle">Kalo</strong>
+              <button id="renameContactBtn" class="rename-contact-btn hidden" type="button" title="Đặt biệt danh" aria-label="Đặt biệt danh">✎</button>
+            </div>
             <small id="chatSubtitle">Riêng tư</small>
           </div>
           <div class="chat-actions">
@@ -294,6 +297,23 @@
     </section>
   </div>
 
+  <div id="contactAliasModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card">
+      <header>
+        <div><h3>Đặt biệt danh</h3><p id="contactOriginalName">Tên gốc</p></div>
+        <button data-close-modal="contactAliasModal" type="button" aria-label="Đóng">×</button>
+      </header>
+      <form id="contactAliasForm" class="stack">
+        <label>Biệt danh hiển thị<input id="contactAliasInput" maxlength="60" placeholder="Ví dụ: Vợ, Anh Nam, Kế toán..." /></label>
+        <p class="form-note">Biệt danh chỉ thay đổi cách hiển thị trên Kalo của bạn, không đổi tên thật của người kia.</p>
+        <div class="alias-modal-actions">
+          <button id="resetContactAliasBtn" class="secondary-btn" type="button">Dùng tên gốc</button>
+          <button class="primary-btn" type="submit">Lưu biệt danh</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
   <div id="identityModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
     <section class="modal-card">
       <header><div><h3>Mở khóa tin nhắn</h3><p id="identityHint">Nhập mã khôi phục Kalo để mở lịch sử riêng tư trên thiết bị này.</p></div></header>
@@ -318,6 +338,18 @@
       <label class="setting-row"><span><strong>Che tin nhắn</strong><small>Làm mờ nội dung, rê chuột vào để xem.</small></span><input id="privacyToggle" type="checkbox" /></label>
       <form id="profileForm" class="stack setting-block">
         <h4>Hồ sơ</h4>
+        <div class="profile-avatar-editor">
+          <div id="profileAvatarPreview" class="profile-avatar-preview" aria-label="Avatar hiện tại">K</div>
+          <div class="profile-avatar-actions">
+            <strong>Ảnh đại diện</strong>
+            <small>Ảnh sẽ được nén tự động trước khi lưu.</small>
+            <div>
+              <button id="chooseAvatarBtn" class="secondary-btn compact-btn" type="button">Chọn ảnh</button>
+              <button id="removeAvatarBtn" class="secondary-btn compact-btn" type="button">Xóa ảnh</button>
+            </div>
+          </div>
+          <input id="avatarInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+        </div>
         <label>Tên hiển thị<input id="displayNameInput" maxlength="80" /></label>
         <button class="secondary-btn" type="submit">Lưu tên</button>
       </form>
@@ -387,6 +419,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.5.3"></script>
+  <script type="module" src="./app.js?v=1.6.0"></script>
 </body>
 </html>
