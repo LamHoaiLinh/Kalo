@@ -357,7 +357,7 @@ function renderCategoryFilterMenu() {
     <div class="category-menu-separator"></div>
     <button class="category-menu-item manage" type="button" data-manage-categories>⚙ <span>Quản lý phân loại</span></button>
   `;
-  $('[data-category-filter]', root).forEach((btn) => btn.addEventListener('click', () => setCategoryFilter(btn.dataset.categoryFilter)));
+  $$('[data-category-filter]', root).forEach((btn) => btn.addEventListener('click', () => setCategoryFilter(btn.dataset.categoryFilter)));
   $('[data-manage-categories]', root)?.addEventListener('click', () => {
     hide('#categoryFilterMenu');
     openCategoryManager();
@@ -388,7 +388,7 @@ function renderCategoryManager() {
     </div>
   `).join('') || '<div class="category-empty">Chưa có phân loại. Hãy tạo một thẻ mới ở phía trên.</div>';
 
-  $('[data-category-color]', root).forEach((input) => input.addEventListener('input', () => {
+  $$('[data-category-color]', root).forEach((input) => input.addEventListener('input', () => {
     const item = categoryById(input.dataset.categoryColor);
     if (!item) return;
     item.color = safeCategoryColor(input.value, item.color);
@@ -396,7 +396,7 @@ function renderCategoryManager() {
     renderCategoryFilterMenu();
     renderConversationList();
   }));
-  $('[data-category-name]', root).forEach((input) => input.addEventListener('change', () => {
+  $$('[data-category-name]', root).forEach((input) => input.addEventListener('change', () => {
     const item = categoryById(input.dataset.categoryName);
     if (!item) return;
     const name = input.value.trim().slice(0, 30);
@@ -409,7 +409,7 @@ function renderCategoryManager() {
     renderCategoryFilterMenu();
     renderConversationList();
   }));
-  $('[data-category-delete]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-category-delete]', root).forEach((btn) => btn.addEventListener('click', () => {
     const item = categoryById(btn.dataset.categoryDelete);
     if (!item) return;
     if (!window.confirm(`Xóa phân loại “${item.name}”? Cuộc trò chuyện sẽ chỉ bị bỏ thẻ, không bị xóa.`)) return;
@@ -474,7 +474,7 @@ function openConversationCategoryMenu(conversationId, anchor) {
     <div class="category-menu-separator"></div>
     <button class="category-menu-item manage" type="button" data-manage-categories>⚙ <span>Quản lý phân loại</span></button>
   `;
-  $('[data-assign-category]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-assign-category]', root).forEach((btn) => btn.addEventListener('click', () => {
     assignConversationCategory(conversationId, btn.dataset.assignCategory || '');
   }));
   $('[data-manage-categories]', root)?.addEventListener('click', () => {
@@ -1269,8 +1269,8 @@ function renderConversationList() {
     </div>`;
   }).join('') || '<div class="empty-chat" style="padding:32px 10px"><p>Không có cuộc trò chuyện phù hợp.</p></div>';
 
-  $('[data-conv-id]', list).forEach((btn) => btn.addEventListener('click', () => openConversation(btn.dataset.convId)));
-  $('[data-classify-conv]', list).forEach((btn) => btn.addEventListener('click', (event) => {
+  $$('[data-conv-id]', list).forEach((btn) => btn.addEventListener('click', () => openConversation(btn.dataset.convId)));
+  $$('[data-classify-conv]', list).forEach((btn) => btn.addEventListener('click', (event) => {
     event.stopPropagation();
     openConversationCategoryMenu(btn.dataset.classifyConv, btn);
   }));
@@ -1917,7 +1917,7 @@ async function toggleHeart(messageId) {
 
 function setView(view) {
   state.currentView = view;
-  $('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   const search = $('#conversationSearch');
   hide('#conversationList');
   hide('#peopleList');
@@ -2372,7 +2372,7 @@ async function initAuth() {
 }
 
 function bindAppEvents() {
-  $('.rail-btn[data-view]').forEach((btn) => btn.addEventListener('click', () => setView(btn.dataset.view)));
+  $$('.rail-btn[data-view]').forEach((btn) => btn.addEventListener('click', () => setView(btn.dataset.view)));
   $('#categoryFilterBtn').addEventListener('click', (event) => {
     event.stopPropagation();
     toggleCategoryFilterMenu();
@@ -2449,7 +2449,7 @@ function bindAppEvents() {
     } catch {}
   });
 
-  $('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-close-modal]').forEach((btn) => btn.addEventListener('click', () => {
     const id = btn.dataset.closeModal;
     if (id === 'addFriendModal') stopQrScanner();
     hide(`#${id}`);
