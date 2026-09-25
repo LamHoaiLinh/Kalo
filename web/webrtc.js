@@ -6,7 +6,11 @@ function keyOf(transferId, peerId) {
   return `${transferId}:${peerId}`;
 }
 
-async function createReceiveTarget(meta) {
+async function createReceiveTarget(meta, customFactory = null) {
+  if (customFactory) {
+    const custom = await customFactory(meta);
+    if (custom) return custom;
+  }
   if ('showSaveFilePicker' in window) {
     const handle = await window.showSaveFilePicker({
       suggestedName: meta.name || 'kalo-file',
@@ -96,7 +100,7 @@ export class KaloFileTransfer {
   }
 
   async requestReceive(transferId, senderId, meta) {
-    const target = await createReceiveTarget(meta);
+    const target = await createReceiveTarget(meta, this.callbacks.createReceiveTarget);
     this.receiveTargets.set(transferId, target);
     await this.sendSignal(transferId, senderId, 'request', { requestedAt: Date.now() });
     this.status({ type: 'waiting', transferId, message: 'Đang chờ máy người gửi kết nối...' });
@@ -260,7 +264,8 @@ export class KaloFileTransfer {
         if (message.t === 'done') {
           await finishReceiveTarget(target);
           this.receiveTargets.delete(transferId);
-          this.status({ type: 'done', transferId, message: 'Đã nhận xong file.' });
+          this.callbacks.onReceived?.({ transferId, target });
+          this.status({ type: 'done', transferId, message: target.kaloDocument ? 'Đã lưu file vào My Documents.' : 'Đã nhận xong file.' });
           await this.sendSignal(transferId, peerId, 'done', { received: target.received });
           try { session.pc.close(); } catch {}
         }
