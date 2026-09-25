@@ -91,6 +91,7 @@ export class KaloDocuments {
   constructor(userId, callbacks = {}) {
     this.userId = userId || 'default';
     this.directoryKey = `documents-directory:${this.userId}`;
+    this.timelineKey = `documents-timeline:${this.userId}`;
     this.callbacks = callbacks;
     this.directoryHandle = null;
     this.mode = 'opfs';
@@ -255,6 +256,24 @@ export class KaloDocuments {
     if (!directory) return;
     await directory.removeEntry(name);
     this.changed();
+  }
+
+  async loadTimeline() {
+    const value = await dbGet(this.timelineKey);
+    return Array.isArray(value) ? value : [];
+  }
+
+  async saveTimeline(items) {
+    const safe = Array.isArray(items) ? items.slice(-10000) : [];
+    await dbPut(this.timelineKey, safe);
+    return safe;
+  }
+
+  async appendTimeline(item) {
+    const items = await this.loadTimeline();
+    items.push(item);
+    await this.saveTimeline(items);
+    return item;
   }
 
   async open(name) {
