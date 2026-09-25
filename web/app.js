@@ -489,7 +489,7 @@ function renderDocumentsList() {
     </button>`
   ).join('') || '<div class="contact-empty">My Documents đang trống.<br>Bấm “Thêm file” để lưu file trên thiết bị này.</div>';
 
-  $('[data-document-name]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-document-name]', root).forEach((btn) => btn.addEventListener('click', () => {
     selectDocument(btn.dataset.documentName);
   }));
 }
@@ -1010,7 +1010,7 @@ function renderMessages() {
 async function openConversation(id) {
   state.currentConversationId = id;
   state.currentView = 'chats';
-  $('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === 'chats'));
+  $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === 'chats'));
   renderConversationList();
   renderChatHeader();
   hide('#documentsHome');
@@ -1282,7 +1282,7 @@ function renderStickerGrid() {
   root.innerHTML = STICKERS.map((sticker) =>
     `<button class="sticker-choice" type="button" data-sticker="${escapeHtml(sticker)}" aria-label="Sticker ${escapeHtml(sticker)}">${escapeHtml(sticker)}</button>`
   ).join('');
-  $('[data-sticker]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-sticker]', root).forEach((btn) => btn.addEventListener('click', () => {
     sendSticker(btn.dataset.sticker).catch((e) => toast(e.message || 'Không gửi được sticker.', 'error'));
   }));
 }
