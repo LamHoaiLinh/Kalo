@@ -1300,3 +1300,93 @@ body{overflow:hidden}
     border-radius:13px;
   }
 }
+
+
+/* v1.6.4 - Full avatar viewer */
+.avatar-clickable{
+  cursor:zoom-in!important;
+}
+.avatar-clickable:hover{
+  box-shadow:0 0 0 2px rgba(70,170,116,.22),0 5px 14px rgba(35,90,60,.18);
+  transform:scale(1.035);
+}
+.avatar,
+.msg-avatar,
+#chatAvatar,
+.profile-avatar-preview,
+.rail-self-avatar{
+  transition:transform .14s ease,box-shadow .14s ease;
+}
+.avatar-viewer-backdrop{
+  z-index:7200;
+  background:rgba(7,18,13,.84);
+  backdrop-filter:blur(3px);
+}
+.avatar-viewer-card{
+  position:relative;
+  width:min(92vw,900px);
+  height:min(90vh,900px);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:52px 24px 22px;
+  background:transparent;
+}
+.avatar-viewer-image{
+  display:block;
+  max-width:100%;
+  max-height:calc(90vh - 110px);
+  width:auto;
+  height:auto;
+  object-fit:contain;
+  border-radius:18px;
+  background:#eef5f1;
+  box-shadow:0 18px 60px rgba(0,0,0,.36);
+}
+.avatar-viewer-name{
+  max-width:min(88vw,700px);
+  color:#fff;
+  font-size:15px;
+  font-weight:800;
+  text-align:center;
+  text-shadow:0 2px 8px rgba(0,0,0,.4);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.avatar-viewer-close{
+  position:absolute;
+  top:5px;
+  right:5px;
+  width:42px;
+  height:42px;
+  border:1px solid rgba(255,255,255,.28);
+  border-radius:50%;
+  background:rgba(255,255,255,.94);
+  color:#35594a;
+  display:grid;
+  place-items:center;
+  padding:0;
+  font-size:26px;
+  line-height:1;
+  cursor:pointer;
+  box-shadow:0 7px 20px rgba(0,0,0,.22);
+  transition:transform .14s ease,background .14s ease;
+}
+.avatar-viewer-close:hover{
+  transform:scale(1.08);
+  background:#fff;
+}
+@media(max-width:720px){
+  .avatar-viewer-card{
+    width:96vw;
+    height:92vh;
+    padding:50px 12px 18px;
+  }
+  .avatar-viewer-image{
+    max-height:calc(92vh - 105px);
+    border-radius:14px;
+  }
+}
