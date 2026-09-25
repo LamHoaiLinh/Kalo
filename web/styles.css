@@ -495,3 +495,46 @@ body.privacy-mode .image-card:hover .image-preview{filter:none}
   .call-controls{min-height:78px;gap:12px}
   .call-control{width:48px;height:48px}
 }
+
+
+/* v1.4 - My Documents as self-chat + in-chat search */
+.message-search-panel{
+  border-bottom:1px solid var(--line);background:#f8fcfa;padding:10px 12px;flex:0 0 auto
+}
+.message-search-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.message-search-text{
+  min-width:220px;flex:1;display:flex;align-items:center;gap:7px;background:#fff;
+  border:1px solid var(--line);border-radius:12px;padding:0 10px
+}
+.message-search-text input{
+  border:0!important;box-shadow:none!important;padding:10px 2px!important;background:transparent!important;min-width:0
+}
+.message-search-date{
+  display:flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);
+  border-radius:12px;padding:0 9px;color:var(--muted);font-size:11px;font-weight:800
+}
+.message-search-date input{border:0;background:transparent;padding:9px 2px;color:var(--text);outline:none}
+.compact-btn{min-height:36px;padding:8px 10px}
+.message-search-summary{font-size:11px;color:var(--muted);padding:8px 2px 2px}
+.message-search-results{
+  max-height:210px;overflow:auto;display:flex;flex-direction:column;gap:5px;padding-top:6px
+}
+.message-search-result{
+  width:100%;border:1px solid transparent;background:#fff;border-radius:11px;padding:8px 10px;
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;text-align:left;color:inherit
+}
+.message-search-result:hover{border-color:#cfe7da;background:#eef8f3}
+.message-search-result strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.message-search-result small{font-size:10px;color:var(--muted)}
+.message-search-empty{font-size:12px;color:var(--muted);padding:10px 2px}
+.msg-row.search-hit .bubble{outline:3px solid rgba(85,170,125,.3);outline-offset:2px}
+.my-doc-conversation .avatar{font-size:21px}
+.my-doc-file-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.my-doc-file-actions .secondary-btn,.my-doc-file-actions .danger-btn{min-height:32px;padding:6px 9px;font-size:11px}
+.my-doc-note{font-size:10px;color:var(--muted);margin-top:5px}
+@media (max-width:760px){
+  .message-search-panel{padding:8px}
+  .message-search-text{min-width:100%}
+  .message-search-date{flex:1}
+  .message-search-results{max-height:180px}
+}
