@@ -553,3 +553,46 @@ body.privacy-mode .image-card:hover .image-preview{filter:none}
   cursor:pointer;
 }
 .my-doc-delete-btn:hover{background:#ffecee;border-color:#e8aeb3}
+
+
+/* v1.4.2 - Custom composer icons supplied by user */
+.compose-image-btn{
+  overflow:visible;
+  cursor:pointer;
+  transition:
+    transform .16s ease,
+    background-color .16s ease,
+    border-color .16s ease,
+    box-shadow .16s ease;
+}
+.compose-tool-image{
+  width:27px;
+  height:27px;
+  object-fit:contain;
+  display:block;
+  pointer-events:none;
+  transform:scale(1);
+  filter:drop-shadow(0 1px 1px rgba(27,72,49,.10));
+  transition:transform .16s ease,filter .16s ease;
+}
+.compose-image-btn:hover{
+  background:#e5f6ed;
+  border-color:#79c79f;
+  box-shadow:0 5px 14px rgba(44,139,92,.20),0 0 0 2px rgba(98,178,135,.10);
+  transform:translateY(-2px) scale(1.06);
+}
+.compose-image-btn:hover .compose-tool-image{
+  transform:scale(1.16);
+  filter:drop-shadow(0 3px 4px rgba(20,82,50,.25)) saturate(1.08);
+}
+.compose-image-btn:active{
+  transform:translateY(0) scale(.98);
+  box-shadow:0 2px 7px rgba(44,139,92,.14);
+}
+.compose-image-btn:focus-visible{
+  outline:3px solid rgba(58,157,105,.28);
+  outline-offset:2px;
+}
+@media(max-width:720px){
+  .compose-tool-image{width:25px;height:25px}
+}
