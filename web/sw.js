@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v10-quick-actions';
+const CACHE='kalo-native-v11-kanban-notifications';
 const APP_SHELL=[
   './',
   './index.html',
   './styles.css?v=1.5.1',
-  './app.js?v=1.5.1',
+  './app.js?v=1.5.2',
   './config.js',
   './crypto.js',
   './webrtc.js',
