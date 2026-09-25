@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v6-self-docs-search';
+const CACHE='kalo-native-v7-sticker-esc-actions';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.4.0',
-  './app.js?v=1.4.0',
+  './styles.css?v=1.4.1',
+  './app.js?v=1.4.1',
   './config.js',
   './crypto.js',
   './webrtc.js',
