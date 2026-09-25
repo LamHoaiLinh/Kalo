@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.6.1" />
+  <link rel="stylesheet" href="./styles.css?v=1.6.2" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -191,6 +191,9 @@
         </section>
 
         <div id="messageList" class="message-list"></div>
+        <button id="scrollToLatestBtn" class="scroll-to-latest-btn hidden" type="button" title="Về tin nhắn mới nhất" aria-label="Về tin nhắn mới nhất">
+          <span>⌄</span>
+        </button>
 
         <div id="fileProgress" class="file-progress hidden">
           <div><strong id="fileProgressText">Đang truyền file...</strong><span id="fileProgressPct">0%</span></div>
@@ -446,6 +449,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.6.1"></script>
+  <script type="module" src="./app.js?v=1.6.2"></script>
 </body>
 </html>
