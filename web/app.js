@@ -430,7 +430,10 @@ async function bitmapFromAvatarSource(source) {
 
 async function openAvatarCrop(source, { replaceSource = true } = {}) {
   let bitmap = null;
+  const settingsWasOpen = !$('#settingsModal')?.classList.contains('hidden');
   if (!replaceSource && state.avatarCrop?.bitmap) {
+    state.avatarCrop.returnToSettings = settingsWasOpen || state.avatarCrop.returnToSettings;
+    hide('#settingsModal');
     show('#avatarCropModal');
     renderAvatarCrop();
     return;
@@ -455,9 +458,11 @@ async function openAvatarCrop(source, { replaceSource = true } = {}) {
     pointerId: null,
     lastX: 0,
     lastY: 0,
+    returnToSettings: settingsWasOpen,
   };
   $('#avatarZoomRange').value = '100';
   renderAvatarCrop();
+  hide('#settingsModal');
   show('#avatarCropModal');
 }
 
@@ -474,13 +479,17 @@ function applyAvatarCropPreview() {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(source, 0, 0, source.width, source.height, 0, 0, 256, 256);
   state.avatarPendingDataUrl = output.toDataURL('image/jpeg', 0.84);
+  const returnToSettings = Boolean(state.avatarCrop?.returnToSettings);
   updateProfileAvatarPreview();
   hide('#avatarCropModal');
+  if (returnToSettings) show('#settingsModal');
   toast('Đã áp dụng crop. Bấm “Lưu Avatar” để lưu chính thức.');
 }
 
 function cancelAvatarCrop() {
+  const returnToSettings = Boolean(state.avatarCrop?.returnToSettings);
   hide('#avatarCropModal');
+  if (returnToSettings) show('#settingsModal');
 }
 
 async function saveOwnAvatar(avatarUrl) {
@@ -1105,10 +1114,7 @@ async function loadMyDocumentMessages(syncLegacy = true) {
     renderDocumentsList();
     renderMessages();
     renderMessageSearchResults();
-    setTimeout(() => {
-      const list = $('#messageList');
-      if (list) list.scrollTop = list.scrollHeight;
-    }, 0);
+    setTimeout(() => scrollMessagesToLatest({ smooth: false }), 0);
   }
 }
 
@@ -1121,10 +1127,7 @@ async function appendMyDocumentItem(item) {
   renderDocumentsList();
   renderMessages();
   renderMessageSearchResults();
-  setTimeout(() => {
-    const list = $('#messageList');
-    if (list) list.scrollTop = list.scrollHeight;
-  }, 0);
+  setTimeout(() => scrollMessagesToLatest({ smooth: false }), 0);
 }
 
 async function sendMyDocumentText(text) {
@@ -1449,10 +1452,7 @@ async function loadMessages(conversationId) {
   await loadReactions();
   renderMessages();
   await markRead(conversationId);
-  setTimeout(() => {
-    const list = $('#messageList');
-    list.scrollTop = list.scrollHeight;
-  }, 0);
+  setTimeout(() => scrollMessagesToLatest({ smooth: false }), 0);
 }
 
 async function loadReactions() {
@@ -1643,6 +1643,27 @@ function renderChatHeader() {
   }
 }
 
+function isMessageListNearBottom(threshold = 90) {
+  const list = $('#messageList');
+  if (!list) return true;
+  return (list.scrollHeight - list.scrollTop - list.clientHeight) <= threshold;
+}
+
+function updateScrollToLatestButton() {
+  const list = $('#messageList');
+  const button = $('#scrollToLatestBtn');
+  if (!list || !button) return;
+  const showButton = list.scrollHeight > list.clientHeight + 20 && !isMessageListNearBottom(110);
+  button.classList.toggle('hidden', !showButton);
+}
+
+function scrollMessagesToLatest({ smooth = true } = {}) {
+  const list = $('#messageList');
+  if (!list) return;
+  list.scrollTo({ top: list.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  setTimeout(updateScrollToLatestButton, smooth ? 240 : 0);
+}
+
 function renderMessages() {
   const list = $('#messageList');
   if (!list || (!state.currentConversationId && state.currentView !== 'documents')) return;
@@ -1722,9 +1743,10 @@ function renderMessages() {
   $$('[data-my-doc-download]', list).forEach((btn) => btn.addEventListener('click', () => {
     state.documentsManager.download(btn.dataset.myDocDownload).catch((e) => toast(e.message || 'Không tải được file.', 'error'));
   }));
-  $$('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
     removeMyDocumentMessage(btn.dataset.myDocRemove).catch((e) => toast(e.message || 'Không xóa được nội dung.', 'error'));
   }));
+  requestAnimationFrame(updateScrollToLatestButton);
 }
 
 async function openConversation(id) {
@@ -2793,6 +2815,11 @@ function bindAppEvents() {
   });
   $('#messageSearchDate').addEventListener('change', () => runMessageSearch().catch(console.error));
 
+  const messageList = $('#messageList');
+  messageList.addEventListener('scroll', updateScrollToLatestButton, { passive: true });
+  $('#scrollToLatestBtn').addEventListener('click', () => scrollMessagesToLatest({ smooth: true }));
+  window.addEventListener('resize', updateScrollToLatestButton);
+
   renderStickerGrid();
   $('#stickerBtn').addEventListener('click', () => {
     $('#stickerPanel').classList.toggle('hidden');
@@ -3050,6 +3077,11 @@ function bindAppEvents() {
     }
     if (event.key === 'Escape') {
       if (!$('#callModal').classList.contains('hidden')) return;
+      if (!$('#avatarCropModal').classList.contains('hidden')) {
+        event.preventDefault();
+        cancelAvatarCrop();
+        return;
+      }
       if (!$('#conversationCategoryMenu').classList.contains('hidden')) {
         event.preventDefault();
         hide('#conversationCategoryMenu');
