@@ -313,3 +313,17 @@ body.privacy-mode .conv-item:hover .conv-preview{
   .toast-host{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom))}
   .toast{max-width:none}
 }
+
+
+/* v1.1.1 - Remember login */
+.remember-row{
+  display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px!important;
+  padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:#f7fbf9;
+  cursor:pointer;font-weight:400!important
+}
+.remember-row input{
+  width:18px!important;height:18px;margin:1px 0 0;flex:0 0 auto;accent-color:var(--green)
+}
+.remember-row span{display:flex;flex-direction:column;gap:2px}
+.remember-row strong{font-size:12px;color:var(--text)}
+.remember-row small{font-size:11px;line-height:1.35;color:var(--muted)}
