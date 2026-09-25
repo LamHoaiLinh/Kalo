@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.0.0" />
+  <link rel="stylesheet" href="./styles.css?v=1.1.0" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -88,7 +88,10 @@
           <h2 id="leftPaneTitle">Tin nhắn</h2>
           <small id="onlineSummary">Đang kết nối...</small>
         </div>
-        <button id="newChatBtn" class="round-btn" type="button" title="Cuộc trò chuyện mới">＋</button>
+        <div class="pane-actions">
+          <button id="addFriendBtn" class="header-action hidden" type="button" title="Thêm bạn"><span>＋</span><b>Thêm bạn</b></button>
+          <button id="createGroupBtn" class="header-action" type="button" title="Tạo nhóm"><span>👥</span><b>Tạo nhóm</b></button>
+        </div>
       </header>
       <div class="search-wrap"><input id="conversationSearch" placeholder="Tìm cuộc trò chuyện..." /></div>
       <div id="conversationList" class="conversation-list"></div>
@@ -131,15 +134,66 @@
     </section>
   </main>
 
-  <div id="newChatModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+  <div id="addFriendModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card friend-modal">
+      <header>
+        <div><h3>Thêm bạn</h3><p>Quét QR hoặc nhập ID Kalo. Lời mời cần được người kia đồng ý.</p></div>
+        <button data-close-modal="addFriendModal" type="button" aria-label="Đóng">×</button>
+      </header>
+
+      <div class="friend-tabs">
+        <button class="friend-tab active" data-friend-tab="scan" type="button">Quét QR</button>
+        <button class="friend-tab" data-friend-tab="id" type="button">Nhập ID</button>
+        <button class="friend-tab" data-friend-tab="mine" type="button">QR của tôi</button>
+      </div>
+
+      <section data-friend-panel="scan" class="friend-panel">
+        <div class="qr-camera-wrap">
+          <video id="qrVideo" playsinline muted></video>
+          <div class="qr-scan-frame"></div>
+          <div id="qrCameraHint" class="qr-camera-hint">Bấm “Mở camera” rồi đưa mã QR vào giữa khung.</div>
+        </div>
+        <div class="qr-actions">
+          <button id="startQrBtn" class="primary-btn" type="button">📷 Mở camera</button>
+          <label class="secondary-btn qr-upload-btn">🖼 Chọn ảnh QR<input id="qrImageInput" type="file" accept="image/*" hidden /></label>
+        </div>
+        <p class="form-note">Trên điện thoại, Kalo ưu tiên camera sau. Bạn cũng có thể chọn ảnh QR từ thư viện.</p>
+      </section>
+
+      <section data-friend-panel="id" class="friend-panel hidden">
+        <form id="addFriendIdForm" class="stack">
+          <label>ID Kalo<input id="friendIdInput" maxlength="32" placeholder="Ví dụ: lamhoailinh" autocomplete="off" /></label>
+          <button class="primary-btn" type="submit">Gửi lời mời kết bạn</button>
+        </form>
+      </section>
+
+      <section data-friend-panel="mine" class="friend-panel hidden">
+        <div class="my-qr-card">
+          <div id="myQrCode" class="my-qr-code" aria-label="Mã QR Kalo của tôi"></div>
+          <strong id="myQrName">Kalo</strong>
+          <span id="myQrId">@id</span>
+          <p>Người khác quét mã này để gửi lời mời kết bạn.</p>
+        </div>
+        <button id="shareQrBtn" class="secondary-btn full-btn" type="button">Chia sẻ liên kết kết bạn</button>
+      </section>
+    </section>
+  </div>
+
+  <div id="groupModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
     <section class="modal-card modal-wide">
-      <header><div><h3>Cuộc trò chuyện mới</h3><p>Chọn một người hoặc nhiều người để tạo nhóm.</p></div><button data-close-modal="newChatModal">×</button></header>
-      <label class="modal-field">Tên nhóm <span class="optional">(chỉ cần khi chọn từ 2 người)</span>
+      <header>
+        <div><h3>Tạo nhóm</h3><p>Chỉ chọn từ danh sách bạn bè đã kết bạn.</p></div>
+        <button data-close-modal="groupModal" type="button" aria-label="Đóng">×</button>
+      </header>
+      <label class="modal-field">Tên nhóm
         <input id="groupNameInput" maxlength="80" placeholder="Ví dụ: Gia đình" />
       </label>
-      <input id="peopleSearch" class="modal-search" placeholder="Tìm theo tên hoặc ID..." />
-      <div id="newChatPeople" class="people-picker"></div>
-      <footer><button data-close-modal="newChatModal" class="secondary-btn" type="button">Hủy</button><button id="createChatBtn" class="primary-btn" type="button">Tạo</button></footer>
+      <input id="groupPeopleSearch" class="modal-search" placeholder="Tìm bạn bè..." />
+      <div id="groupFriendsPicker" class="people-picker"></div>
+      <footer>
+        <button data-close-modal="groupModal" class="secondary-btn" type="button">Hủy</button>
+        <button id="createGroupSubmitBtn" class="primary-btn" type="button">Tạo nhóm</button>
+      </footer>
     </section>
   </div>
 
@@ -186,6 +240,7 @@
 
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
-  <script type="module" src="./app.js?v=1.0.0"></script>
+  <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
+  <script type="module" src="./app.js?v=1.1.0"></script>
 </body>
 </html>
