@@ -1498,16 +1498,16 @@ function renderPeopleList() {
 
   root.innerHTML = requestHtml + friendHtml + outgoingHtml;
 
-  $('[data-message-user]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-message-user]', root).forEach((btn) => btn.addEventListener('click', () => {
     createOrOpenDirect(btn.dataset.messageUser).catch((e) => toast(e.message, 'error'));
   }));
-  $('[data-accept-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-accept-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
     acceptFriendRequest(btn.dataset.acceptFriend).catch((e) => toast(e.message, 'error'));
   }));
-  $('[data-decline-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-decline-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
     removeFriendship(btn.dataset.declineFriend, 'Đã bỏ qua lời mời.').catch((e) => toast(e.message, 'error'));
   }));
-  $('[data-cancel-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-cancel-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
     removeFriendship(btn.dataset.cancelFriend, 'Đã hủy lời mời.').catch((e) => toast(e.message, 'error'));
   }));
 }
