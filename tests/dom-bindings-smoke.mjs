@@ -49,6 +49,16 @@ const requiredIds = [
   'messageSearchText',
   'messageSearchDate',
   'messageSearchResults',
+  'categoryFilterWrap',
+  'categoryFilterBtn',
+  'categoryFilterMenu',
+  'conversationCategoryMenu',
+  'categoryManagerModal',
+  'categoryCreateForm',
+  'categoryCreateColor',
+  'categoryCreateName',
+  'categoryManagerList',
+  'logoutBtn',
 ];
 
 for (const id of requiredIds) {
@@ -65,5 +75,11 @@ if (!app.includes("sendMyDocumentText(")) throw new Error('My Documents self-cha
 if (!app.includes("sendMyDocumentFile(")) throw new Error('My Documents self-chat file flow is missing');
 if (!app.includes("fetchConversationMessagesForSearch(")) throw new Error('Message search flow is missing');
 if (!app.includes("addEventListener('paste'")) throw new Error('Paste-to-chat binding is missing');
+if (!app.includes("loadConversationCategories(")) throw new Error('Conversation category storage is missing');
+if (!app.includes("openConversationCategoryMenu(")) throw new Error('Conversation category assignment UI is missing');
+if (!app.includes("renderCategoryFilterMenu(")) throw new Error('Conversation category filter UI is missing');
+if (!app.includes("createConversationCategory(")) throw new Error('Conversation category manager is missing');
+if (!html.includes('logout-icon-img')) throw new Error('Custom logout icon is missing');
+if (!html.includes('id="imageBtn"') || !html.includes('compose-tool-image')) throw new Error('Custom image composer icon is missing');
 
 console.log('Kalo DOM binding smoke test passed.');
