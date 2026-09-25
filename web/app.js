@@ -71,6 +71,10 @@ const state = {
   documentsManager: null,
   documentItems: [],
   selectedDocumentName: null,
+  myDocumentTimeline: [],
+  myDocumentMessages: [],
+  messageSearchCache: [],
+  messageSearchSeq: 0,
   callManager: null,
   activeCall: null,
   incomingCall: null,
@@ -412,6 +416,8 @@ async function initLocalDocuments() {
     },
   });
   await state.documentsManager.init();
+  state.myDocumentTimeline = await state.documentsManager.loadTimeline();
+  state.myDocumentMessages = state.myDocumentTimeline.map(myDocumentMessageFromTimeline);
   await refreshStorageUi();
 }
 
@@ -465,9 +471,8 @@ function documentIcon(item) {
 
 async function loadDocuments() {
   if (!state.documentsManager) return;
-  const query = state.currentView === 'documents' ? ($('#conversationSearch')?.value || '') : '';
   try {
-    state.documentItems = await state.documentsManager.list(query);
+    state.documentItems = await state.documentsManager.list('');
     renderDocumentsList();
   } catch (e) {
     state.documentItems = [];
@@ -479,19 +484,21 @@ async function loadDocuments() {
 function renderDocumentsList() {
   const root = $('#documentsList');
   if (!root) return;
-  root.innerHTML = state.documentItems.map((item) => `
-    <button class="document-row ${item.name === state.selectedDocumentName ? 'active' : ''}" type="button" data-document-name="${escapeHtml(item.name)}">
-      <span class="document-row-icon">${documentIcon(item)}</span>
-      <span class="document-row-main">
-        <strong>${escapeHtml(item.name)}</strong>
-        <small>${formatBytes(item.size)} · ${item.modified ? new Date(item.modified).toLocaleDateString('vi-VN') : ''}</small>
-      </span>
-    </button>`
-  ).join('') || '<div class="contact-empty">My Documents đang trống.<br>Bấm “Thêm file” để lưu file trên thiết bị này.</div>';
-
-  $$('[data-document-name]', root).forEach((btn) => btn.addEventListener('click', () => {
-    selectDocument(btn.dataset.documentName);
-  }));
+  const latest = state.myDocumentMessages[state.myDocumentMessages.length - 1];
+  const preview = latest
+    ? messageSearchTextOf(latest) || (latest.decoded?.type === 'sticker' ? 'Sticker' : 'Đã lưu nội dung')
+    : (state.documentItems.length ? `${state.documentItems.length} file đã lưu` : 'Gửi tin nhắn, ảnh hoặc file cho chính bạn');
+  const when = latest?.created_at ? formatTime(latest.created_at) : '';
+  root.innerHTML = `
+    <button class="conv-item my-doc-conversation active" type="button" data-open-my-documents>
+      <div class="avatar">🗂</div>
+      <div class="conv-main">
+        <div class="conv-name">My Documents</div>
+        <div class="conv-preview">${escapeHtml(preview)}</div>
+      </div>
+      <div class="conv-meta">${escapeHtml(when)}</div>
+    </button>`;
+  $('[data-open-my-documents]', root)?.addEventListener('click', () => openMyDocumentsChat());
 }
 
 function selectDocument(name) {
@@ -540,10 +547,184 @@ function selectDocument(name) {
 
 async function addDocuments(files) {
   if (!state.documentsManager || !files?.length) return;
-  for (const file of files) await state.documentsManager.saveFile(file);
+  for (const file of files) {
+    await sendMyDocumentFile(file, file.type?.startsWith('image/') ? 'image' : 'file');
+  }
   await loadDocuments();
   await refreshStorageUi();
   toast(files.length > 1 ? `Đã thêm ${files.length} file vào My Documents.` : 'Đã thêm file vào My Documents.');
+}
+
+function myDocumentMessageFromTimeline(item) {
+  const type = item.type || 'text';
+  return {
+    id: item.id,
+    conversation_id: '__my_documents__',
+    sender_id: state.user?.id,
+    kind: type === 'file' || type === 'image' ? 'file_offer' : 'text',
+    created_at: item.created_at || new Date().toISOString(),
+    localDocument: true,
+    decoded: {
+      type,
+      text: item.text || '',
+      sticker: item.sticker || '',
+      name: item.name || item.fileName || '',
+      fileName: item.fileName || item.name || '',
+      size: Number(item.size || 0),
+      mime: item.mime || '',
+      thumbnail: item.thumbnail || null,
+    },
+  };
+}
+
+async function persistMyDocumentTimeline() {
+  if (!state.documentsManager) return;
+  state.myDocumentTimeline = await state.documentsManager.saveTimeline(state.myDocumentTimeline);
+}
+
+async function syncLegacyDocumentsToTimeline() {
+  if (!state.documentsManager) return;
+  const existingNames = new Set(
+    state.myDocumentTimeline
+      .filter((item) => item.fileName)
+      .map((item) => item.fileName)
+  );
+  let changed = false;
+  for (const item of state.documentItems) {
+    if (existingNames.has(item.name)) continue;
+    state.myDocumentTimeline.push({
+      id: crypto.randomUUID(),
+      type: item.type?.startsWith('image/') ? 'image' : 'file',
+      fileName: item.name,
+      name: item.name,
+      size: item.size,
+      mime: item.type || 'application/octet-stream',
+      thumbnail: null,
+      created_at: new Date(item.modified || Date.now()).toISOString(),
+      importedLegacy: true,
+    });
+    existingNames.add(item.name);
+    changed = true;
+  }
+  if (changed) {
+    state.myDocumentTimeline.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    await persistMyDocumentTimeline();
+  }
+}
+
+async function loadMyDocumentMessages(syncLegacy = true) {
+  if (!state.documentsManager) return;
+  state.myDocumentTimeline = await state.documentsManager.loadTimeline();
+  await loadDocuments();
+  if (syncLegacy) await syncLegacyDocumentsToTimeline();
+  state.myDocumentMessages = state.myDocumentTimeline.map(myDocumentMessageFromTimeline);
+  if (state.currentView === 'documents') {
+    state.messages = [...state.myDocumentMessages];
+    state.reactions.clear();
+    renderDocumentsList();
+    renderMessages();
+    renderMessageSearchResults();
+    setTimeout(() => {
+      const list = $('#messageList');
+      if (list) list.scrollTop = list.scrollHeight;
+    }, 0);
+  }
+}
+
+async function appendMyDocumentItem(item) {
+  state.myDocumentTimeline.push(item);
+  state.myDocumentTimeline.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  await persistMyDocumentTimeline();
+  state.myDocumentMessages = state.myDocumentTimeline.map(myDocumentMessageFromTimeline);
+  state.messages = [...state.myDocumentMessages];
+  renderDocumentsList();
+  renderMessages();
+  renderMessageSearchResults();
+  setTimeout(() => {
+    const list = $('#messageList');
+    if (list) list.scrollTop = list.scrollHeight;
+  }, 0);
+}
+
+async function sendMyDocumentText(text) {
+  const value = String(text || '').trim();
+  if (!value) return;
+  await appendMyDocumentItem({
+    id: crypto.randomUUID(),
+    type: 'text',
+    text: value,
+    created_at: new Date().toISOString(),
+  });
+}
+
+async function sendMyDocumentSticker(sticker) {
+  if (!sticker) return;
+  await appendMyDocumentItem({
+    id: crypto.randomUUID(),
+    type: 'sticker',
+    sticker,
+    created_at: new Date().toISOString(),
+  });
+  hide('#stickerPanel');
+}
+
+function normalizeLocalFile(file, type = 'file') {
+  if (!file) return null;
+  if (file.name) return file;
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, '').replace('T', '_');
+  const ext = type === 'image'
+    ? (file.type === 'image/jpeg' ? '.jpg' : file.type === 'image/webp' ? '.webp' : '.png')
+    : '';
+  return new File([file], `Kalo_${type === 'image' ? 'Anh' : 'File'}_${stamp}${ext}`, { type: file.type || 'application/octet-stream' });
+}
+
+async function sendMyDocumentFile(inputFile, type = 'file') {
+  if (!state.documentsManager || !inputFile) return;
+  const file = normalizeLocalFile(inputFile, type);
+  const savedName = await state.documentsManager.saveFile(file);
+  const thumbnail = type === 'image' ? await makeImageThumbnail(file) : null;
+  await appendMyDocumentItem({
+    id: crypto.randomUUID(),
+    type,
+    fileName: savedName,
+    name: savedName,
+    size: file.size,
+    mime: file.type || 'application/octet-stream',
+    thumbnail,
+    created_at: new Date().toISOString(),
+  });
+  await refreshStorageUi();
+}
+
+async function removeMyDocumentMessage(messageId) {
+  const item = state.myDocumentTimeline.find((x) => x.id === messageId);
+  if (!item) return;
+  state.myDocumentTimeline = state.myDocumentTimeline.filter((x) => x.id !== messageId);
+  if (item.fileName && !state.myDocumentTimeline.some((x) => x.fileName === item.fileName)) {
+    try { await state.documentsManager.delete(item.fileName); } catch {}
+  }
+  await persistMyDocumentTimeline();
+  await loadMyDocumentMessages(false);
+}
+
+function renderMyDocumentsHeader() {
+  $('#chatAvatar').textContent = 'M';
+  $('#chatTitle').textContent = 'My Documents';
+  $('#chatSubtitle').textContent = 'Chỉ mình bạn · lưu cục bộ trên thiết bị';
+  hide('#audioCallBtn');
+  hide('#videoCallBtn');
+  hide('#chatInfoBtn');
+  $('#messageInput').placeholder = 'Nhắn cho chính mình...';
+}
+
+async function openMyDocumentsChat() {
+  state.currentView = 'documents';
+  hide('#documentsHome');
+  hide('#emptyChat');
+  show('#activeChat');
+  $('#appScreen').classList.add('chat-open');
+  renderMyDocumentsHeader();
+  await loadMyDocumentMessages(true);
 }
 
 function showIncomingCall(incoming) {
@@ -931,6 +1112,8 @@ function renderChatHeader() {
   const title = conversationLabel(conv);
   $('#chatTitle').textContent = title;
   $('#chatAvatar').textContent = initials(title);
+  $('#messageInput').placeholder = 'Nhập tin nhắn...';
+  show('#chatInfoBtn');
   const direct = conv.kind === 'direct';
   $('#audioCallBtn').classList.toggle('hidden', !direct);
   $('#videoCallBtn').classList.toggle('hidden', !direct);
@@ -944,7 +1127,7 @@ function renderChatHeader() {
 
 function renderMessages() {
   const list = $('#messageList');
-  if (!list || !state.currentConversationId) return;
+  if (!list || (!state.currentConversationId && state.currentView !== 'documents')) return;
   list.innerHTML = state.messages.map((m) => {
     const own = m.sender_id === state.user.id;
     const sender = state.profiles.get(m.sender_id);
@@ -958,7 +1141,8 @@ function renderMessages() {
     } else if (m.decoded.type === 'sticker') {
       body = `<div class="sticker-message" aria-label="Sticker">${escapeHtml(m.decoded.sticker || '🙂')}</div>`;
     } else if (m.decoded.type === 'image') {
-      const canReceive = !own;
+      const local = Boolean(m.localDocument);
+      const canReceive = !local && !own;
       const preview = typeof m.decoded.thumbnail === 'string' && m.decoded.thumbnail.startsWith('data:image/')
         ? `<img class="image-preview" src="${escapeHtml(m.decoded.thumbnail)}" alt="${escapeHtml(m.decoded.name || 'Ảnh')}" />`
         : '<div class="image-preview-placeholder">🖼</div>';
@@ -967,22 +1151,29 @@ function renderMessages() {
         <div class="file-card-head image-meta">
           <div style="min-width:0">
             <div class="file-name">${escapeHtml(m.decoded.name || 'Ảnh')}</div>
-            <div class="file-size">${escapeHtml(formatBytes(m.decoded.size))} · ảnh gốc truyền trực tiếp</div>
+            <div class="file-size">${escapeHtml(formatBytes(m.decoded.size))} · ${local ? 'lưu trên thiết bị' : 'ảnh gốc truyền trực tiếp'}</div>
           </div>
         </div>
-        ${canReceive ? `<button class="secondary-btn" data-receive-file="${m.id}" type="button">Nhận ảnh gốc</button>` : '<div class="file-size" style="margin-top:8px">Giữ Kalo mở để người nhận lấy ảnh gốc.</div>'}
+        ${local ? `<div class="my-doc-file-actions">
+          <button class="secondary-btn" data-my-doc-open="${escapeHtml(m.decoded.fileName)}" type="button">Mở</button>
+          <button class="secondary-btn" data-my-doc-download="${escapeHtml(m.decoded.fileName)}" type="button">Tải bản sao</button>
+        </div>` : (canReceive ? `<button class="secondary-btn" data-receive-file="${m.id}" type="button">Nhận ảnh gốc</button>` : '<div class="file-size" style="margin-top:8px">Giữ Kalo mở để người nhận lấy ảnh gốc.</div>')}
       </div>`;
     } else if (m.kind === 'file_offer' || m.decoded.type === 'file') {
-      const canReceive = !own;
+      const local = Boolean(m.localDocument);
+      const canReceive = !local && !own;
       body = `<div class="file-card">
         <div class="file-card-head">
           <div class="file-icon">📎</div>
           <div style="min-width:0">
             <div class="file-name">${escapeHtml(m.decoded.name || 'File')}</div>
-            <div class="file-size">${escapeHtml(formatBytes(m.decoded.size))} · truyền trực tiếp</div>
+            <div class="file-size">${escapeHtml(formatBytes(m.decoded.size))} · ${local ? 'lưu trên thiết bị' : 'truyền trực tiếp'}</div>
           </div>
         </div>
-        ${canReceive ? `<button class="secondary-btn" data-receive-file="${m.id}" type="button">Nhận file</button>` : '<div class="file-size" style="margin-top:8px">Giữ Kalo mở để người nhận tải file.</div>'}
+        ${local ? `<div class="my-doc-file-actions">
+          <button class="secondary-btn" data-my-doc-open="${escapeHtml(m.decoded.fileName)}" type="button">Mở</button>
+          <button class="secondary-btn" data-my-doc-download="${escapeHtml(m.decoded.fileName)}" type="button">Tải bản sao</button>
+        </div>` : (canReceive ? `<button class="secondary-btn" data-receive-file="${m.id}" type="button">Nhận file</button>` : '<div class="file-size" style="margin-top:8px">Giữ Kalo mở để người nhận tải file.</div>')}
       </div>`;
     } else {
       body = `<div class="bubble-text">${escapeHtml(m.decoded.text || '')}</div>`;
@@ -997,19 +1188,31 @@ function renderMessages() {
           <div class="bubble-time">${escapeHtml(formatTime(m.created_at))}</div>
         </div>
         <div class="msg-actions">
-          <button class="mini-action" data-heart="${m.id}" type="button">${mine ? '❤️' : '♡'} ${hearts.length || ''}</button>
+          ${m.localDocument
+            ? `<button class="mini-action" data-my-doc-remove="${m.id}" type="button" title="Xóa khỏi My Documents">🗑</button>`
+            : `<button class="mini-action" data-heart="${m.id}" type="button">${mine ? '❤️' : '♡'} ${hearts.length || ''}</button>`}
         </div>
       </div>
     </div>`;
   }).join('');
 
-  $$('[data-heart]', list).forEach((btn) => btn.addEventListener('click', () => toggleHeart(btn.dataset.heart)));
-  $$('[data-receive-file]', list).forEach((btn) => btn.addEventListener('click', () => receiveFile(btn.dataset.receiveFile)));
+  $('[data-heart]', list).forEach((btn) => btn.addEventListener('click', () => toggleHeart(btn.dataset.heart)));
+  $('[data-receive-file]', list).forEach((btn) => btn.addEventListener('click', () => receiveFile(btn.dataset.receiveFile)));
+  $('[data-my-doc-open]', list).forEach((btn) => btn.addEventListener('click', () => {
+    state.documentsManager.open(btn.dataset.myDocOpen).catch((e) => toast(e.message || 'Không mở được file.', 'error'));
+  }));
+  $('[data-my-doc-download]', list).forEach((btn) => btn.addEventListener('click', () => {
+    state.documentsManager.download(btn.dataset.myDocDownload).catch((e) => toast(e.message || 'Không tải được file.', 'error'));
+  }));
+  $('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
+    removeMyDocumentMessage(btn.dataset.myDocRemove).catch((e) => toast(e.message || 'Không xóa được nội dung.', 'error'));
+  }));
 }
 
 async function openConversation(id) {
   state.currentConversationId = id;
   state.currentView = 'chats';
+  closeMessageSearch(false);
   $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === 'chats'));
   renderConversationList();
   renderChatHeader();
@@ -1288,7 +1491,12 @@ function renderStickerGrid() {
 }
 
 async function sendSticker(sticker) {
-  if (!sticker || !state.currentConversationId) return;
+  if (!sticker) return;
+  if (state.currentView === 'documents') {
+    await sendMyDocumentSticker(sticker);
+    return;
+  }
+  if (!state.currentConversationId) return;
   const profiles = memberProfiles(state.currentConversationId);
   if (!profiles.length) return;
   const envelope = await encryptPayload({ type: 'sticker', sticker, createdAt: Date.now() }, profiles);
@@ -1366,7 +1574,18 @@ async function sendTransferFile(file, type = 'file') {
 async function sendMessage() {
   const input = $('#messageInput');
   const text = input.value.trim();
-  if (!text || !state.currentConversationId) return;
+  if (!text) return;
+  if (state.currentView === 'documents') {
+    try {
+      await sendMyDocumentText(text);
+      input.value = '';
+      input.style.height = '';
+    } catch (e) {
+      toast(e.message || 'Không lưu được tin nhắn.', 'error');
+    }
+    return;
+  }
+  if (!state.currentConversationId) return;
   const profiles = memberProfiles(state.currentConversationId);
   if (!profiles.length) return;
 
@@ -1396,7 +1615,8 @@ async function sendMessage() {
 
 async function sendFile(file) {
   try {
-    await sendTransferFile(file, 'file');
+    if (state.currentView === 'documents') await sendMyDocumentFile(file, 'file');
+    else await sendTransferFile(file, 'file');
   } catch (e) {
     toast(e.message || 'Không thể gửi file.', 'error');
   }
@@ -1404,7 +1624,8 @@ async function sendFile(file) {
 
 async function sendImage(file) {
   try {
-    await sendTransferFile(file, 'image');
+    if (state.currentView === 'documents') await sendMyDocumentFile(file, 'image');
+    else await sendTransferFile(file, 'image');
   } catch (e) {
     toast(e.message || 'Không thể gửi ảnh.', 'error');
   }
@@ -1458,18 +1679,21 @@ function setView(view) {
 
   if (view === 'documents') {
     $('#leftPaneTitle').textContent = 'My Documents';
-    $('#onlineSummary').textContent = 'Lưu cục bộ trên thiết bị';
-    search.placeholder = 'Tìm file...';
+    $('#onlineSummary').textContent = 'Chat với chính bạn · lưu cục bộ';
+    search.placeholder = 'My Documents';
+    search.value = '';
     show('#documentsList');
-    hide('#activeChat');
+    hide('#documentsHome');
     hide('#emptyChat');
-    show('#documentsHome');
-    loadDocuments().catch((e) => toast(e.message, 'error'));
+    show('#activeChat');
+    renderMyDocumentsHeader();
+    openMyDocumentsChat().catch((e) => toast(e.message || 'Không mở được My Documents.', 'error'));
     refreshStorageUi().catch(console.error);
     return;
   }
 
   hide('#documentsHome');
+  closeMessageSearch(false);
   if (state.currentConversationId) {
     show('#activeChat');
     hide('#emptyChat');
@@ -1492,6 +1716,158 @@ function setView(view) {
     renderConversationList();
   }
   renderOnlineSummary();
+}
+
+function messageSearchTextOf(message) {
+  const d = message?.decoded || {};
+  if (d.type === 'text' || d.type === 'locked') return String(d.text || '');
+  if (d.type === 'sticker') return String(d.sticker || '');
+  if (d.type === 'image' || d.type === 'file') return String(d.name || d.fileName || '');
+  return '';
+}
+
+function localDateKey(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+async function fetchConversationMessagesForSearch(dateValue = '') {
+  if (!state.currentConversationId || !state.identity) return [];
+  const rows = [];
+  const pageSize = 1000;
+  let from = 0;
+  let pages = 0;
+  let startIso = '';
+  let endIso = '';
+  if (dateValue) {
+    const start = new Date(`${dateValue}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    startIso = start.toISOString();
+    endIso = end.toISOString();
+  }
+
+  while (pages < 10) {
+    let query = supabase
+      .from('kalo_messages')
+      .select('*')
+      .eq('conversation_id', state.currentConversationId)
+      .order('created_at', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (startIso) query = query.gte('created_at', startIso).lt('created_at', endIso);
+    const { data, error } = await query;
+    if (error) throw error;
+    const batch = data || [];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+    pages += 1;
+  }
+
+  const decoded = [];
+  for (const row of rows) {
+    let payload;
+    try {
+      payload = await decryptPayload(row.encrypted_payloads, state.user.id, state.identity);
+    } catch {
+      payload = { type: 'locked', text: 'Không mở được tin nhắn này trên thiết bị hiện tại.' };
+    }
+    decoded.push({ ...row, decoded: payload });
+  }
+  return decoded;
+}
+
+function renderMessageSearchResults(matches = null) {
+  const root = $('#messageSearchResults');
+  const summary = $('#messageSearchSummary');
+  if (!root || !summary || $('#messageSearchPanel').classList.contains('hidden')) return;
+  const textQuery = ($('#messageSearchText')?.value || '').trim().toLowerCase();
+  const dateValue = $('#messageSearchDate')?.value || '';
+  const source = matches || state.messageSearchCache || [];
+  if (!textQuery && !dateValue) {
+    summary.textContent = 'Nhập từ khóa hoặc chọn ngày.';
+    root.innerHTML = '';
+    return;
+  }
+  const filtered = source.filter((m) => {
+    const textOk = !textQuery || messageSearchTextOf(m).toLowerCase().includes(textQuery);
+    const dateOk = !dateValue || localDateKey(m.created_at) === dateValue;
+    return textOk && dateOk;
+  });
+  summary.textContent = filtered.length
+    ? `Tìm thấy ${filtered.length} kết quả${filtered.length >= 10000 ? ' (đã giới hạn 10.000 tin)' : ''}.`
+    : 'Không tìm thấy kết quả phù hợp.';
+  root.innerHTML = filtered.slice().reverse().map((m) => {
+    const text = messageSearchTextOf(m) || (m.decoded?.type === 'sticker' ? 'Sticker' : 'Nội dung');
+    return `<button class="message-search-result" type="button" data-search-message-id="${m.id}">
+      <strong>${escapeHtml(text)}</strong>
+      <small>${escapeHtml(new Date(m.created_at).toLocaleString('vi-VN'))}</small>
+    </button>`;
+  }).join('') || '<div class="message-search-empty">Không có tin nhắn phù hợp.</div>';
+  $('[data-search-message-id]', root).forEach((btn) => btn.addEventListener('click', () => jumpToSearchMessage(btn.dataset.searchMessageId)));
+}
+
+async function runMessageSearch() {
+  const seq = ++state.messageSearchSeq;
+  const textQuery = ($('#messageSearchText')?.value || '').trim();
+  const dateValue = $('#messageSearchDate')?.value || '';
+  if (!textQuery && !dateValue) {
+    state.messageSearchCache = state.currentView === 'documents' ? [...state.myDocumentMessages] : [];
+    renderMessageSearchResults();
+    return;
+  }
+  $('#messageSearchSummary').textContent = 'Đang tìm...';
+  try {
+    const source = state.currentView === 'documents'
+      ? [...state.myDocumentMessages]
+      : await fetchConversationMessagesForSearch(dateValue);
+    if (seq !== state.messageSearchSeq) return;
+    state.messageSearchCache = source;
+    renderMessageSearchResults(source);
+  } catch (e) {
+    if (seq !== state.messageSearchSeq) return;
+    $('#messageSearchSummary').textContent = 'Không tìm được tin nhắn.';
+    $('#messageSearchResults').innerHTML = '';
+    toast(e.message || 'Không tìm được tin nhắn.', 'error');
+  }
+}
+
+function jumpToSearchMessage(messageId) {
+  const source = state.currentView === 'documents' ? state.myDocumentMessages : state.messageSearchCache;
+  const found = source.find((m) => m.id === messageId);
+  if (!found) return;
+  if (!state.messages.some((m) => m.id === messageId)) {
+    state.messages = [...source];
+    renderMessages();
+  }
+  const row = $('[data-message-id]', $('#messageList')).find((el) => el.dataset.messageId === messageId);
+  if (!row) return;
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  row.classList.add('search-hit');
+  setTimeout(() => row.classList.remove('search-hit'), 1800);
+}
+
+function openMessageSearch() {
+  if ($('#activeChat').classList.contains('hidden')) return;
+  show('#messageSearchPanel');
+  state.messageSearchCache = state.currentView === 'documents' ? [...state.myDocumentMessages] : [];
+  $('#messageSearchText').focus();
+  runMessageSearch().catch(console.error);
+}
+
+function closeMessageSearch(clear = false) {
+  hide('#messageSearchPanel');
+  state.messageSearchSeq += 1;
+  state.messageSearchCache = [];
+  if (clear) {
+    if ($('#messageSearchText')) $('#messageSearchText').value = '';
+    if ($('#messageSearchDate')) $('#messageSearchDate').value = '';
+    if ($('#messageSearchResults')) $('#messageSearchResults').innerHTML = '';
+  }
 }
 
 function applyPrivacy(value) {
@@ -1741,7 +2117,7 @@ function bindAppEvents() {
   $$('.rail-btn[data-view]').forEach((btn) => btn.addEventListener('click', () => setView(btn.dataset.view)));
   $('#conversationSearch').addEventListener('input', () => {
     if (state.currentView === 'people') renderPeopleList();
-    else if (state.currentView === 'documents') loadDocuments().catch(console.error);
+    else if (state.currentView === 'documents') renderDocumentsList();
     else renderConversationList();
   });
 
@@ -1818,6 +2194,35 @@ function bindAppEvents() {
     event.currentTarget.style.height = 'auto';
     event.currentTarget.style.height = `${Math.min(120, event.currentTarget.scrollHeight)}px`;
   });
+  $('#messageInput').addEventListener('paste', async (event) => {
+    const files = [...(event.clipboardData?.items || [])]
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+    if (!files.length) return;
+    event.preventDefault();
+    for (const file of files) {
+      if (file.type?.startsWith('image/')) await sendImage(file);
+      else await sendFile(file);
+    }
+  });
+
+  let messageSearchTimer = null;
+  $('#messageSearchBtn').addEventListener('click', () => {
+    if ($('#messageSearchPanel').classList.contains('hidden')) openMessageSearch();
+    else closeMessageSearch(false);
+  });
+  $('#messageSearchClose').addEventListener('click', () => closeMessageSearch(false));
+  $('#messageSearchClear').addEventListener('click', () => {
+    $('#messageSearchText').value = '';
+    $('#messageSearchDate').value = '';
+    runMessageSearch().catch(console.error);
+  });
+  $('#messageSearchText').addEventListener('input', () => {
+    clearTimeout(messageSearchTimer);
+    messageSearchTimer = setTimeout(() => runMessageSearch().catch(console.error), 260);
+  });
+  $('#messageSearchDate').addEventListener('change', () => runMessageSearch().catch(console.error));
 
   renderStickerGrid();
   $('#stickerBtn').addEventListener('click', () => {
@@ -1939,6 +2344,11 @@ function bindAppEvents() {
   });
 
   document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && !$('#activeChat').classList.contains('hidden') && !modalOpen()) {
+      event.preventDefault();
+      openMessageSearch();
+      return;
+    }
     if (event.altKey && event.key.toLowerCase() === 'k') {
       event.preventDefault();
       if (window.parent !== window) window.parent.postMessage({ source: 'kalo', type: 'toggle' }, '*');
