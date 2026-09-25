@@ -86,6 +86,7 @@ const state = {
   conversationCategoryMap: {},
   activeCategoryFilter: 'all',
   categoryMenuConversationId: null,
+  contactAliases: {},
   qrScanner: null,
 };
 
@@ -242,8 +243,7 @@ function conversationLabel(conv) {
   if (!conv) return 'Kalo';
   if (conv.kind === 'group') return conv.title || 'Nhóm Kalo';
   const otherId = memberIds(conv.id).find((id) => id !== state.user?.id);
-  const p = state.profiles.get(otherId);
-  return p?.display_name || p?.username || 'Cuộc trò chuyện';
+  return contactDisplayName(otherId);
 }
 function conversationAvatar(conv) {
   return initials(conversationLabel(conv));
@@ -256,8 +256,7 @@ function directPeerId(conv = currentConversation()) {
   return memberIds(conv.id).find((id) => id !== state.user?.id) || null;
 }
 function profileName(userId) {
-  const p = state.profiles.get(userId);
-  return p?.display_name || p?.username || 'Người dùng Kalo';
+  return contactDisplayName(userId);
 }
 function acceptedFriendIds() {
   const ids = new Set();
@@ -292,6 +291,137 @@ function friendProfileFromRow(row) {
 }
 
 
+
+function contactAliasStorageKey() {
+  return state.user?.id ? `kalo-contact-aliases:${state.user.id}` : '';
+}
+
+function loadContactAliases() {
+  const key = contactAliasStorageKey();
+  try {
+    const parsed = key ? JSON.parse(localStorage.getItem(key) || '{}') : {};
+    state.contactAliases = parsed && typeof parsed === 'object' ? { ...parsed } : {};
+  } catch {
+    state.contactAliases = {};
+  }
+}
+
+function saveContactAliases() {
+  const key = contactAliasStorageKey();
+  if (!key) return;
+  localStorage.setItem(key, JSON.stringify(state.contactAliases || {}));
+}
+
+function contactAlias(userId) {
+  const value = String(state.contactAliases?.[userId] || '').trim();
+  return value || '';
+}
+
+function contactDisplayName(userId) {
+  const alias = contactAlias(userId);
+  if (alias) return alias;
+  const p = state.profiles.get(userId);
+  return p?.display_name || p?.username || 'Người dùng Kalo';
+}
+
+function safeAvatarUrl(value) {
+  const url = String(value || '').trim();
+  if (!url) return '';
+  if (url.startsWith('data:image/')) return url;
+  if (/^https:\/\//i.test(url)) return url;
+  return '';
+}
+
+function avatarContent(profile, fallbackLabel) {
+  const url = safeAvatarUrl(profile?.avatar_url);
+  if (url) return `<img class="avatar-image" src="${escapeHtml(url)}" alt="" />`;
+  return escapeHtml(initials(fallbackLabel || profile?.display_name || profile?.username));
+}
+
+function setAvatarElement(element, profile, fallbackLabel) {
+  if (!element) return;
+  const url = safeAvatarUrl(profile?.avatar_url);
+  if (url) {
+    element.innerHTML = `<img class="avatar-image" src="${escapeHtml(url)}" alt="" />`;
+    element.classList.add('has-image');
+  } else {
+    element.textContent = initials(fallbackLabel || profile?.display_name || profile?.username);
+    element.classList.remove('has-image');
+  }
+}
+
+function updateProfileAvatarPreview() {
+  const preview = $('#profileAvatarPreview');
+  if (!preview) return;
+  setAvatarElement(preview, state.profile, state.profile?.display_name || state.profile?.username || 'K');
+  const removeBtn = $('#removeAvatarBtn');
+  if (removeBtn) removeBtn.disabled = !safeAvatarUrl(state.profile?.avatar_url);
+}
+
+async function compressAvatar(file) {
+  if (!file?.type?.startsWith('image/')) throw new Error('Hãy chọn file ảnh.');
+  if (file.size > 12 * 1024 * 1024) throw new Error('Ảnh quá lớn. Vui lòng chọn ảnh dưới 12 MB.');
+  const bitmap = await createImageBitmap(file);
+  try {
+    const size = 256;
+    const side = Math.min(bitmap.width, bitmap.height);
+    const sx = Math.max(0, Math.floor((bitmap.width - side) / 2));
+    const sy = Math.max(0, Math.floor((bitmap.height - side) / 2));
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, size, size);
+    return canvas.toDataURL('image/jpeg', 0.82);
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+async function saveOwnAvatar(avatarUrl) {
+  const { error } = await supabase
+    .from('kalo_profiles')
+    .update({ avatar_url: avatarUrl || null, updated_at: new Date().toISOString() })
+    .eq('user_id', state.user.id);
+  if (error) throw error;
+  state.profile.avatar_url = avatarUrl || null;
+  await loadProfiles();
+  state.profile = state.profiles.get(state.user.id) || state.profile;
+  updateProfileAvatarPreview();
+  renderPeopleList();
+  renderConversationList();
+  renderChatHeader();
+  renderMessages();
+}
+
+function openContactAliasModal() {
+  const conv = currentConversation();
+  const peerId = directPeerId(conv);
+  if (!peerId) return;
+  const p = state.profiles.get(peerId);
+  const original = p?.display_name || p?.username || 'Người dùng Kalo';
+  $('#contactOriginalName').textContent = `Tên gốc: ${original}`;
+  $('#contactAliasInput').value = contactAlias(peerId);
+  show('#contactAliasModal');
+  setTimeout(() => $('#contactAliasInput')?.focus(), 60);
+}
+
+function saveCurrentContactAlias(value) {
+  const peerId = directPeerId();
+  if (!peerId) return;
+  const clean = String(value || '').trim().slice(0, 60);
+  if (clean) state.contactAliases[peerId] = clean;
+  else delete state.contactAliases[peerId];
+  saveContactAliases();
+  hide('#contactAliasModal');
+  renderConversationList();
+  renderPeopleList();
+  renderChatHeader();
+  renderMessages();
+  toast(clean ? 'Đã lưu biệt danh.' : 'Đã dùng lại tên gốc.');
+}
 
 function categoryStorageKey() {
   return state.user?.id ? `kalo-conversation-categories:${state.user.id}` : '';
@@ -1269,12 +1399,16 @@ function renderConversationList() {
     const otherId = conv.kind === 'direct' ? memberIds(conv.id).find((id) => id !== state.user.id) : null;
     const online = otherId && isOnline(otherId);
     const category = conversationCategory(conv.id);
+    const peerProfile = otherId ? state.profiles.get(otherId) : null;
+    const avatarHtml = conv.kind === 'direct'
+      ? avatarContent(peerProfile, label)
+      : escapeHtml(initials(label));
     const categoryBadge = category
       ? `<span class="conv-category-badge" style="--category-color:${safeCategoryColor(category.color)}"><i></i>${escapeHtml(category.name)}</span>`
       : '';
     return `<div class="conv-row ${conv.id === state.currentConversationId ? 'active' : ''}">
       <button class="conv-item ${conv.id === state.currentConversationId ? 'active' : ''}" data-conv-id="${conv.id}" type="button">
-        <div class="avatar">${escapeHtml(conversationAvatar(conv))}</div>
+        <div class="avatar ${peerProfile?.avatar_url ? 'has-image' : ''}">${avatarHtml}</div>
         <div class="conv-main">
           <div class="conv-name-line"><div class="conv-name">${escapeHtml(label)}${online ? ' · 🟢' : ''}</div>${categoryBadge}</div>
           <div class="conv-preview">${escapeHtml(preview?.text || 'Bắt đầu trò chuyện')}</div>
@@ -1310,14 +1444,17 @@ function renderPeopleList() {
   const friends = [...acceptedFriendIds()]
     .map((id) => state.profiles.get(id))
     .filter(Boolean)
-    .filter((p) => !query || p.display_name.toLowerCase().includes(query) || p.username.includes(query))
-    .sort((a, b) => a.display_name.localeCompare(b.display_name, 'vi'));
+    .filter((p) => {
+      const display = contactDisplayName(p.user_id).toLowerCase();
+      return !query || display.includes(query) || p.display_name.toLowerCase().includes(query) || p.username.includes(query);
+    })
+    .sort((a, b) => contactDisplayName(a.user_id).localeCompare(contactDisplayName(b.user_id), 'vi'));
 
   const requestHtml = requests.length ? `
     <div class="contact-section">
       <div class="contact-section-title">Lời mời kết bạn <span>${requests.length}</span></div>
       ${requests.map(({ row, profile: p }) => `<div class="person-item request-item">
-        <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
+        <div class="avatar ${p.avatar_url ? 'has-image' : ''}">${avatarContent(p, p.display_name)}</div>
         <div class="person-info">
           <strong>${escapeHtml(p.display_name)}</strong>
           <small>@${escapeHtml(p.username)}</small>
@@ -1332,21 +1469,25 @@ function renderPeopleList() {
   const friendHtml = `
     <div class="contact-section">
       <div class="contact-section-title">Bạn bè <span>${friends.length}</span></div>
-      ${friends.map((p) => `<div class="person-item">
-        <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
-        <div class="person-info">
-          <strong>${escapeHtml(p.display_name)} ${isOnline(p.user_id) ? '🟢' : ''}</strong>
-          <small>@${escapeHtml(p.username)}</small>
-        </div>
-        <button data-message-user="${p.user_id}" type="button">Nhắn tin</button>
-      </div>`).join('') || '<div class="contact-empty">Chưa có bạn bè. Bấm “Thêm bạn” để bắt đầu.</div>'}
+      ${friends.map((p) => {
+        const display = contactDisplayName(p.user_id);
+        const original = p.display_name || p.username;
+        return `<div class="person-item">
+          <div class="avatar ${p.avatar_url ? 'has-image' : ''}">${avatarContent(p, display)}</div>
+          <div class="person-info">
+            <strong>${escapeHtml(display)} ${isOnline(p.user_id) ? '🟢' : ''}</strong>
+            <small>${display !== original ? `${escapeHtml(original)} · ` : ''}@${escapeHtml(p.username)}</small>
+          </div>
+          <button data-message-user="${p.user_id}" type="button">Nhắn tin</button>
+        </div>`;
+      }).join('') || '<div class="contact-empty">Chưa có bạn bè. Bấm “Thêm bạn” để bắt đầu.</div>'}
     </div>`;
 
   const outgoingHtml = outgoing.length ? `
     <div class="contact-section">
       <div class="contact-section-title muted-title">Đang chờ đồng ý <span>${outgoing.length}</span></div>
       ${outgoing.map(({ row, profile: p }) => `<div class="person-item pending-item">
-        <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
+        <div class="avatar ${p.avatar_url ? 'has-image' : ''}">${avatarContent(p, p.display_name)}</div>
         <div class="person-info">
           <strong>${escapeHtml(p.display_name)}</strong>
           <small>@${escapeHtml(p.username)}</small>
@@ -1357,16 +1498,16 @@ function renderPeopleList() {
 
   root.innerHTML = requestHtml + friendHtml + outgoingHtml;
 
-  $$('[data-message-user]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-message-user]', root).forEach((btn) => btn.addEventListener('click', () => {
     createOrOpenDirect(btn.dataset.messageUser).catch((e) => toast(e.message, 'error'));
   }));
-  $$('[data-accept-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-accept-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
     acceptFriendRequest(btn.dataset.acceptFriend).catch((e) => toast(e.message, 'error'));
   }));
-  $$('[data-decline-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-decline-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
     removeFriendship(btn.dataset.declineFriend, 'Đã bỏ qua lời mời.').catch((e) => toast(e.message, 'error'));
   }));
-  $$('[data-cancel-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-cancel-friend]', root).forEach((btn) => btn.addEventListener('click', () => {
     removeFriendship(btn.dataset.cancelFriend, 'Đã hủy lời mời.').catch((e) => toast(e.message, 'error'));
   }));
 }
@@ -1376,17 +1517,24 @@ function renderChatHeader() {
   if (!conv) return;
   const title = conversationLabel(conv);
   $('#chatTitle').textContent = title;
-  $('#chatAvatar').textContent = initials(title);
   $('#messageInput').placeholder = 'Nhập tin nhắn...';
   show('#chatInfoBtn');
   const direct = conv.kind === 'direct';
+  $('#renameContactBtn').classList.toggle('hidden', !direct);
   $('#audioCallBtn').classList.toggle('hidden', !direct);
   $('#videoCallBtn').classList.toggle('hidden', !direct);
   if (conv.kind === 'group') {
+    setAvatarElement($('#chatAvatar'), null, title);
     $('#chatSubtitle').textContent = `${memberIds(conv.id).length} thành viên`;
   } else {
     const other = memberIds(conv.id).find((id) => id !== state.user.id);
-    $('#chatSubtitle').textContent = other && isOnline(other) ? 'Đang online' : 'Riêng tư';
+    const profile = state.profiles.get(other);
+    setAvatarElement($('#chatAvatar'), profile, title);
+    const original = profile?.display_name || profile?.username || '';
+    const onlineText = other && isOnline(other) ? 'Đang online' : 'Riêng tư';
+    $('#chatSubtitle').textContent = contactAlias(other) && original
+      ? `${original} · ${onlineText}`
+      : onlineText;
   }
 }
 
@@ -1445,9 +1593,9 @@ function renderMessages() {
     }
 
     return `<div class="msg-row ${own ? 'own' : 'other'}" data-message-id="${m.id}">
-      ${own ? '' : `<div class="msg-avatar">${escapeHtml(initials(sender?.display_name || sender?.username))}</div>`}
+      ${own ? '' : `<div class="msg-avatar ${sender?.avatar_url ? 'has-image' : ''}">${avatarContent(sender, profileName(m.sender_id))}</div>`}
       <div class="msg-content">
-        ${own ? '' : `<div class="msg-sender">${escapeHtml(sender?.display_name || sender?.username || 'Người dùng')}</div>`}
+        ${own ? '' : `<div class="msg-sender">${escapeHtml(profileName(m.sender_id))}</div>`}
         <div class="bubble">
           ${body}
           <div class="bubble-time">${escapeHtml(formatTime(m.created_at))}</div>
@@ -1685,13 +1833,16 @@ function renderGroupFriendsPicker() {
   const friends = friendProfiles()
     .filter((p) => !q || p.display_name.toLowerCase().includes(q) || p.username.includes(q));
 
-  root.innerHTML = friends.map((p) => `<div class="picker-row">
-    <label>
-      <input type="checkbox" data-pick-friend value="${p.user_id}" ${p.public_key ? '' : 'disabled'} />
-      <div class="avatar">${escapeHtml(initials(p.display_name))}</div>
-      <span><strong>${escapeHtml(p.display_name)}</strong><br><small>@${escapeHtml(p.username)}${p.public_key ? '' : ' · cần mở Kalo trước'}</small></span>
-    </label>
-  </div>`).join('') || '<div class="contact-empty">Chưa có bạn bè phù hợp để thêm vào nhóm.</div>';
+  root.innerHTML = friends.map((p) => {
+    const display = contactDisplayName(p.user_id);
+    return `<div class="picker-row">
+      <label>
+        <input type="checkbox" data-pick-friend value="${p.user_id}" ${p.public_key ? '' : 'disabled'} />
+        <div class="avatar ${p.avatar_url ? 'has-image' : ''}">${avatarContent(p, display)}</div>
+        <span><strong>${escapeHtml(display)}</strong><br><small>@${escapeHtml(p.username)}${p.public_key ? '' : ' · cần mở Kalo trước'}</small></span>
+      </label>
+    </div>`;
+  }).join('') || '<div class="contact-empty">Chưa có bạn bè phù hợp để thêm vào nhóm.</div>';
 }
 
 function openGroupModal() {
@@ -2176,6 +2327,7 @@ async function startApp(session) {
     state.user = session.user;
     state.profile = await getProfile(session.user.id);
     loadConversationCategories();
+    loadContactAliases();
     state.identity = await ensureUserIdentity(state.pendingRecoveryCode);
     state.pendingRecoveryCode = null;
 
@@ -2188,6 +2340,7 @@ async function startApp(session) {
     show('#appScreen');
     $('#settingsAccount').textContent = `@${state.profile.username}`;
     $('#displayNameInput').value = state.profile.display_name;
+    updateProfileAvatarPreview();
     applyPrivacy(localStorage.getItem('kalo-privacy') === '1');
     setView('chats');
     renderOnlineSummary();
@@ -2241,6 +2394,7 @@ async function logout() {
   state.conversationCategoryMap = {};
   state.activeCategoryFilter = 'all';
   state.categoryMenuConversationId = null;
+  state.contactAliases = {};
   clearCallUi();
   hide('#settingsModal');
   hide('#appScreen');
@@ -2603,10 +2757,49 @@ function bindAppEvents() {
   $('#settingsBtn').addEventListener('click', () => {
     $('#settingsAccount').textContent = `@${state.profile?.username || ''}`;
     $('#displayNameInput').value = state.profile?.display_name || '';
+    updateProfileAvatarPreview();
     $('#privacyToggle').checked = document.body.classList.contains('privacy-mode');
     refreshStorageUi().catch(console.error);
     show('#settingsModal');
   });
+
+  $('#chooseAvatarBtn').addEventListener('click', () => $('#avatarInput').click());
+  $('#avatarInput').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const button = $('#chooseAvatarBtn');
+    setBusy(button, true, 'Đang xử lý...');
+    try {
+      const dataUrl = await compressAvatar(file);
+      await saveOwnAvatar(dataUrl);
+      toast('Đã cập nhật ảnh đại diện.');
+    } catch (e) {
+      toast(e.message || 'Không cập nhật được ảnh đại diện.', 'error');
+    } finally {
+      setBusy(button, false);
+    }
+  });
+  $('#removeAvatarBtn').addEventListener('click', async () => {
+    if (!safeAvatarUrl(state.profile?.avatar_url)) return;
+    const button = $('#removeAvatarBtn');
+    setBusy(button, true, '...');
+    try {
+      await saveOwnAvatar('');
+      toast('Đã xóa ảnh đại diện.');
+    } catch (e) {
+      toast(e.message || 'Không xóa được ảnh đại diện.', 'error');
+    } finally {
+      setBusy(button, false);
+    }
+  });
+
+  $('#renameContactBtn').addEventListener('click', openContactAliasModal);
+  $('#contactAliasForm').addEventListener('submit', (event) => {
+    event.preventDefault();
+    saveCurrentContactAlias($('#contactAliasInput').value);
+  });
+  $('#resetContactAliasBtn').addEventListener('click', () => saveCurrentContactAlias(''));
 
   $('#profileForm').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -2619,6 +2812,8 @@ function bindAppEvents() {
     if (error) return toast('Không lưu được tên.', 'error');
     state.profile.display_name = name;
     await loadProfiles();
+    state.profile = state.profiles.get(state.user.id) || state.profile;
+    updateProfileAvatarPreview();
     renderPeopleList();
     renderConversationList();
     renderChatHeader();
