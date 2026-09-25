@@ -2189,6 +2189,17 @@ async function startApp(session) {
   }
 }
 
+function returnToKanban() {
+  if (window.parent !== window) {
+    window.parent.postMessage({ source: 'kalo', type: 'close' }, '*');
+    return;
+  }
+  const target = location.hostname.endsWith('github.io')
+    ? `${location.origin}/Kanban-QLCV-Linh/`
+    : 'https://lamhoailinh.github.io/Kanban-QLCV-Linh/';
+  location.href = target;
+}
+
 async function logout() {
   await stopRealtime();
   await supabase.auth.signOut();
@@ -2561,6 +2572,9 @@ function bindAppEvents() {
   $('#cameraCallBtn').addEventListener('click', () => {
     if (state.activeCall) state.callManager.toggleCamera(state.activeCall);
   });
+
+  $('#returnKanbanBtn').addEventListener('click', returnToKanban);
+  $('#quickLogoutBtn').addEventListener('click', logout);
 
   $('#privacyBtn').addEventListener('click', () => applyPrivacy(!document.body.classList.contains('privacy-mode')));
   $('#privacyToggle').addEventListener('change', (event) => applyPrivacy(event.target.checked));
