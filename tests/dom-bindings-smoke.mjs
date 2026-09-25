@@ -62,6 +62,15 @@ const requiredIds = [
   'logoutBtn',
   'returnKanbanBtn',
   'quickLogoutBtn',
+  'profileAvatarPreview',
+  'chooseAvatarBtn',
+  'removeAvatarBtn',
+  'avatarInput',
+  'renameContactBtn',
+  'contactAliasModal',
+  'contactAliasForm',
+  'contactAliasInput',
+  'resetContactAliasBtn',
 ];
 
 for (const id of requiredIds) {
@@ -85,6 +94,10 @@ if (!app.includes("createConversationCategory(")) throw new Error('Conversation 
 if (!app.includes("notifyParentOfIncomingMessage(")) throw new Error('Kanban incoming-message notification bridge is missing');
 if (!app.includes("event.code === 'Period'")) throw new Error('Alt period privacy shortcut is missing');
 if (!css.includes("Keep composer visible in long chats")) throw new Error('Long-chat composer layout fix is missing');
+if (!app.includes("async function compressAvatar(")) throw new Error('Avatar compression flow is missing');
+if (!app.includes("saveOwnAvatar(")) throw new Error('Avatar profile save flow is missing');
+if (!app.includes("contactAliasStorageKey(")) throw new Error('Private contact nickname storage is missing');
+if (!app.includes("openContactAliasModal(")) throw new Error('Contact nickname UI flow is missing');
 if (!html.includes('logout-icon-img')) throw new Error('Custom logout icon is missing');
 if (!app.includes("function returnToKanban(")) throw new Error('Standalone return-to-Kanban action is missing');
 if (!html.includes('id="imageBtn"') || !html.includes('compose-tool-image')) throw new Error('Custom image composer icon is missing');
