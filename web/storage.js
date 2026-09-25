@@ -66,6 +66,27 @@ async function uniqueFileHandle(directory, wantedName) {
   return directory.getFileHandle(`${base}-${Date.now()}${ext}`, { create: true });
 }
 
+async function moveFilesBetweenDirectories(source, destination) {
+  if (!source || !destination) return 0;
+  if (source.isSameEntry && await source.isSameEntry(destination)) return 0;
+
+  const sourceOk = await ensurePermission(source, true);
+  if (!sourceOk) throw new Error('Kalo cần quyền truy cập thư mục lưu trữ cũ để chuyển dữ liệu tự động.');
+
+  let moved = 0;
+  for await (const [name, handle] of source.entries()) {
+    if (handle.kind !== 'file') continue;
+    const file = await handle.getFile();
+    const target = await uniqueFileHandle(destination, name);
+    const writable = await target.createWritable();
+    await writable.write(file);
+    await writable.close();
+    await source.removeEntry(name);
+    moved += 1;
+  }
+  return moved;
+}
+
 export class KaloDocuments {
   constructor(userId, callbacks = {}) {
     this.userId = userId || 'default';
@@ -112,8 +133,10 @@ export class KaloDocuments {
     if (!window.showDirectoryPicker) {
       await this.ensureOpfs();
       this.changed();
-      return this.status();
+      return { ...this.status(), moved: 0 };
     }
+
+    const oldHandle = this.directoryHandle;
     const handle = await window.showDirectoryPicker({
       id: 'kalo-documents',
       mode: 'readwrite',
@@ -121,12 +144,16 @@ export class KaloDocuments {
     });
     const ok = await ensurePermission(handle, true);
     if (!ok) throw new Error('Kalo chưa được cấp quyền ghi vào thư mục này.');
+
+    let moved = 0;
+    if (oldHandle) moved = await moveFilesBetweenDirectories(oldHandle, handle);
+
     await dbPut(this.directoryKey, handle);
     this.directoryHandle = handle;
     this.mode = 'folder';
     this.label = handle.name || 'Thư mục Kalo';
     this.changed();
-    return this.status();
+    return { ...this.status(), moved };
   }
 
   async requestAccess() {
