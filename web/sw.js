@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v2-friends';
+const CACHE='kalo-native-v3-login-fix';
 const APP_SHELL=[
   './',
   './index.html',
   './styles.css?v=1.1.0',
-  './app.js?v=1.1.0',
+  './app.js?v=1.1.1',
   './config.js',
   './crypto.js',
   './webrtc.js',
