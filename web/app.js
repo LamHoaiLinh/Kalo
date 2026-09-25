@@ -1408,7 +1408,7 @@ function renderConversationList() {
       : '';
     return `<div class="conv-row ${conv.id === state.currentConversationId ? 'active' : ''}">
       <button class="conv-item ${conv.id === state.currentConversationId ? 'active' : ''}" data-conv-id="${conv.id}" type="button">
-        <div class="avatar ${peerProfile?.avatar_url ? 'has-image' : ''}">${avatarHtml}</div>
+        <div class="avatar ${safeAvatarUrl(peerProfile?.avatar_url) ? 'has-image' : ''}">${avatarHtml}</div>
         <div class="conv-main">
           <div class="conv-name-line"><div class="conv-name">${escapeHtml(label)}${online ? ' · 🟢' : ''}</div>${categoryBadge}</div>
           <div class="conv-preview">${escapeHtml(preview?.text || 'Bắt đầu trò chuyện')}</div>
@@ -1454,7 +1454,7 @@ function renderPeopleList() {
     <div class="contact-section">
       <div class="contact-section-title">Lời mời kết bạn <span>${requests.length}</span></div>
       ${requests.map(({ row, profile: p }) => `<div class="person-item request-item">
-        <div class="avatar ${p.avatar_url ? 'has-image' : ''}">${avatarContent(p, p.display_name)}</div>
+        <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image' : ''}">${avatarContent(p, p.display_name)}</div>
         <div class="person-info">
           <strong>${escapeHtml(p.display_name)}</strong>
           <small>@${escapeHtml(p.username)}</small>
@@ -1473,7 +1473,7 @@ function renderPeopleList() {
         const display = contactDisplayName(p.user_id);
         const original = p.display_name || p.username;
         return `<div class="person-item">
-          <div class="avatar ${p.avatar_url ? 'has-image' : ''}">${avatarContent(p, display)}</div>
+          <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image' : ''}">${avatarContent(p, display)}</div>
           <div class="person-info">
             <strong>${escapeHtml(display)} ${isOnline(p.user_id) ? '🟢' : ''}</strong>
             <small>${display !== original ? `${escapeHtml(original)} · ` : ''}@${escapeHtml(p.username)}</small>
@@ -1487,7 +1487,7 @@ function renderPeopleList() {
     <div class="contact-section">
       <div class="contact-section-title muted-title">Đang chờ đồng ý <span>${outgoing.length}</span></div>
       ${outgoing.map(({ row, profile: p }) => `<div class="person-item pending-item">
-        <div class="avatar ${p.avatar_url ? 'has-image' : ''}">${avatarContent(p, p.display_name)}</div>
+        <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image' : ''}">${avatarContent(p, p.display_name)}</div>
         <div class="person-info">
           <strong>${escapeHtml(p.display_name)}</strong>
           <small>@${escapeHtml(p.username)}</small>
@@ -1593,7 +1593,7 @@ function renderMessages() {
     }
 
     return `<div class="msg-row ${own ? 'own' : 'other'}" data-message-id="${m.id}">
-      ${own ? '' : `<div class="msg-avatar ${sender?.avatar_url ? 'has-image' : ''}">${avatarContent(sender, profileName(m.sender_id))}</div>`}
+      ${own ? '' : `<div class="msg-avatar ${safeAvatarUrl(sender?.avatar_url) ? 'has-image' : ''}">${avatarContent(sender, profileName(m.sender_id))}</div>`}
       <div class="msg-content">
         ${own ? '' : `<div class="msg-sender">${escapeHtml(profileName(m.sender_id))}</div>`}
         <div class="bubble">
@@ -1838,7 +1838,7 @@ function renderGroupFriendsPicker() {
     return `<div class="picker-row">
       <label>
         <input type="checkbox" data-pick-friend value="${p.user_id}" ${p.public_key ? '' : 'disabled'} />
-        <div class="avatar ${p.avatar_url ? 'has-image' : ''}">${avatarContent(p, display)}</div>
+        <div class="avatar ${safeAvatarUrl(p.avatar_url) ? 'has-image' : ''}">${avatarContent(p, display)}</div>
         <span><strong>${escapeHtml(display)}</strong><br><small>@${escapeHtml(p.username)}${p.public_key ? '' : ' · cần mở Kalo trước'}</small></span>
       </label>
     </div>`;
