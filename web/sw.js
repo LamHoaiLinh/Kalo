@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v8-custom-composer-icons';
+const CACHE='kalo-native-v9-conversation-categories-icons';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.4.2',
-  './app.js?v=1.4.1',
+  './styles.css?v=1.5.0',
+  './app.js?v=1.5.0',
   './config.js',
   './crypto.js',
   './webrtc.js',
