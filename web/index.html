@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.6.0" />
+  <link rel="stylesheet" href="./styles.css?v=1.6.1" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -297,6 +297,30 @@
     </section>
   </div>
 
+  <div id="avatarCropModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card avatar-crop-card">
+      <header>
+        <div><h3>Crop ảnh đại diện</h3><p>Kéo ảnh để chọn vị trí. Dùng thanh Zoom để phóng to/thu nhỏ.</p></div>
+        <button id="closeAvatarCropBtn" type="button" aria-label="Đóng">×</button>
+      </header>
+      <div id="avatarCropViewport" class="avatar-crop-viewport">
+        <canvas id="avatarCropCanvas" width="360" height="360" aria-label="Khung crop ảnh đại diện"></canvas>
+        <div class="avatar-crop-mask" aria-hidden="true"></div>
+        <div class="avatar-crop-hint" aria-hidden="true">Kéo ảnh để căn chỉnh</div>
+      </div>
+      <label class="avatar-zoom-row">
+        <span>Zoom</span>
+        <input id="avatarZoomRange" type="range" min="100" max="300" value="100" step="1" />
+        <output id="avatarZoomValue">100%</output>
+      </label>
+      <div class="avatar-crop-actions">
+        <button id="resetAvatarCropBtn" class="secondary-btn" type="button">Đặt lại</button>
+        <button id="cancelAvatarCropBtn" class="secondary-btn" type="button">Hủy</button>
+        <button id="applyAvatarCropBtn" class="primary-btn" type="button">Áp dụng Crop</button>
+      </div>
+    </section>
+  </div>
+
   <div id="contactAliasModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
     <section class="modal-card">
       <header>
@@ -343,10 +367,13 @@
           <div class="profile-avatar-actions">
             <strong>Ảnh đại diện</strong>
             <small>Ảnh sẽ được nén tự động trước khi lưu.</small>
-            <div>
+            <div class="avatar-action-row">
               <button id="chooseAvatarBtn" class="secondary-btn compact-btn" type="button">Chọn ảnh</button>
+              <button id="cropAvatarBtn" class="secondary-btn compact-btn" type="button">✂ Crop thủ công</button>
+              <button id="saveAvatarBtn" class="primary-btn compact-btn" type="button" disabled>Lưu Avatar</button>
               <button id="removeAvatarBtn" class="secondary-btn compact-btn" type="button">Xóa ảnh</button>
             </div>
+            <small id="avatarPendingHint" class="avatar-pending-hint hidden">Ảnh mới đang chờ lưu.</small>
           </div>
           <input id="avatarInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
         </div>
@@ -419,6 +446,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.6.0"></script>
+  <script type="module" src="./app.js?v=1.6.1"></script>
 </body>
 </html>
