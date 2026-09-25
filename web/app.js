@@ -289,7 +289,7 @@ function loadConversationCategories() {
   const key = categoryStorageKey();
   let parsed = null;
   try { parsed = key ? JSON.parse(localStorage.getItem(key) || 'null') : null; } catch {}
-  const source = Array.isArray(parsed?.categories) && parsed.categories.length
+  const source = Array.isArray(parsed?.categories)
     ? parsed.categories
     : DEFAULT_CONVERSATION_CATEGORIES;
   state.conversationCategories = source.map((item) => ({
