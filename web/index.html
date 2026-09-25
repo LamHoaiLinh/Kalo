@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.6.3" />
+  <link rel="stylesheet" href="./styles.css?v=1.6.4" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -302,6 +302,14 @@
     </section>
   </div>
 
+  <div id="avatarViewerModal" class="modal-backdrop avatar-viewer-backdrop hidden" role="dialog" aria-modal="true" aria-label="Xem ảnh đại diện">
+    <section class="avatar-viewer-card">
+      <button id="closeAvatarViewerBtn" class="avatar-viewer-close" type="button" aria-label="Đóng ảnh đại diện">×</button>
+      <img id="avatarViewerImage" class="avatar-viewer-image" alt="Ảnh đại diện" />
+      <div id="avatarViewerName" class="avatar-viewer-name"></div>
+    </section>
+  </div>
+
   <div id="avatarCropModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
     <section class="modal-card avatar-crop-card">
       <header>
@@ -451,6 +459,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.6.3"></script>
+  <script type="module" src="./app.js?v=1.6.4"></script>
 </body>
 </html>
