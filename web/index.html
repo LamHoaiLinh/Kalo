@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.1.0" />
+  <link rel="stylesheet" href="./styles.css?v=1.2.0" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -131,9 +131,19 @@
           <progress id="fileProgressBar" max="100" value="0"></progress>
         </div>
 
+        <div id="stickerPanel" class="sticker-panel hidden">
+          <div class="sticker-panel-head"><strong>Sticker</strong><button id="closeStickerBtn" type="button">×</button></div>
+          <div id="stickerGrid" class="sticker-grid"></div>
+        </div>
+
         <footer class="composer">
+          <input id="imageInput" type="file" accept="image/*" hidden />
           <input id="fileInput" type="file" hidden />
-          <button id="attachBtn" class="compose-icon" type="button" title="Gửi file trực tiếp">📎</button>
+          <div class="compose-tools">
+            <button id="stickerBtn" class="compose-icon" type="button" title="Gửi sticker">☺</button>
+            <button id="imageBtn" class="compose-icon" type="button" title="Gửi ảnh">🖼</button>
+            <button id="fileBtn" class="compose-icon" type="button" title="Gửi file">📎</button>
+          </div>
           <textarea id="messageInput" rows="1" placeholder="Nhập tin nhắn..."></textarea>
           <button id="sendBtn" class="send-btn" type="button">Gửi</button>
         </footer>
@@ -248,6 +258,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.1.1"></script>
+  <script type="module" src="./app.js?v=1.2.0"></script>
 </body>
 </html>
