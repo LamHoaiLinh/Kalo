@@ -2146,7 +2146,10 @@ function applyPrivacy(value) {
   document.body.classList.toggle('privacy-mode', enabled);
   localStorage.setItem('kalo-privacy', enabled ? '1' : '0');
   $('#privacyToggle').checked = enabled;
-  $('#privacyBtn').classList.toggle('active', enabled);
+  const privacyBtn = $('#privacyBtn');
+  privacyBtn.classList.toggle('active', enabled);
+  privacyBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  privacyBtn.title = enabled ? 'Bỏ che tin nhắn (Alt+.)' : 'Che tin nhắn (Alt+.)';
 }
 
 function showRecoveryCode(code) {
@@ -2655,6 +2658,13 @@ function bindAppEvents() {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && !$('#activeChat').classList.contains('hidden') && !modalOpen()) {
       event.preventDefault();
       openMessageSearch();
+      return;
+    }
+    if (event.altKey && (event.code === 'Period' || event.key === '.' || event.key === '>')) {
+      event.preventDefault();
+      const next = !document.body.classList.contains('privacy-mode');
+      applyPrivacy(next);
+      toast(next ? 'Đã che tin nhắn.' : 'Đã bỏ che tin nhắn.');
       return;
     }
     if (event.altKey && event.key.toLowerCase() === 'k') {
