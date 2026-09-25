@@ -1325,6 +1325,7 @@ async function startRealtime() {
     .channel(`kalo-data-${state.user.id}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kalo_messages' }, async (payload) => {
       const row = payload.new;
+      await loadProfiles().catch(() => {});
       if (!state.conversations.some((c) => c.id === row.conversation_id)) {
         await loadConversations();
       }
