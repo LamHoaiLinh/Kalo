@@ -1,12 +1,15 @@
-const CACHE='kalo-native-v1';
+const CACHE='kalo-native-v2-friends';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.0.0',
-  './app.js?v=1.0.0',
+  './styles.css?v=1.1.0',
+  './app.js?v=1.1.0',
   './config.js',
   './crypto.js',
   './webrtc.js',
+  './vendor/qrcode.min.js',
+  './vendor/qr-scanner.min.js',
+  './vendor/qr-scanner-worker.min.js',
   './icon.svg',
   './manifest.webmanifest'
 ];
