@@ -12,6 +12,8 @@ import {
   decryptPayload,
 } from './crypto.js';
 import { KaloFileTransfer } from './webrtc.js';
+import { KaloDocuments } from './storage.js';
+import { KaloCallManager } from './call.js';
 import QrScanner from './vendor/qr-scanner.min.js';
 
 const REMEMBER_LOGIN_KEY = 'kalo-remember-login';
@@ -66,6 +68,12 @@ const state = {
   realtimeChannels: [],
   presenceChannel: null,
   fileManager: null,
+  documentsManager: null,
+  documentItems: [],
+  selectedDocumentName: null,
+  callManager: null,
+  activeCall: null,
+  incomingCall: null,
   starting: false,
   startedUserId: null,
   pendingRecoveryCode: null,
@@ -211,6 +219,14 @@ function conversationAvatar(conv) {
 function isOnline(userId) {
   return state.presence.has(userId);
 }
+function directPeerId(conv = currentConversation()) {
+  if (!conv || conv.kind !== 'direct') return null;
+  return memberIds(conv.id).find((id) => id !== state.user?.id) || null;
+}
+function profileName(userId) {
+  const p = state.profiles.get(userId);
+  return p?.display_name || p?.username || 'Người dùng Kalo';
+}
 function acceptedFriendIds() {
   const ids = new Set();
   for (const row of state.friendships) {
@@ -326,6 +342,12 @@ async function stopRealtime() {
     try { await state.fileManager.stop(); } catch {}
     state.fileManager = null;
   }
+  if (state.callManager) {
+    try { await state.callManager.stop(); } catch {}
+    state.callManager = null;
+  }
+  state.activeCall = null;
+  state.incomingCall = null;
 }
 
 async function startPresence() {
@@ -381,6 +403,235 @@ function onFileStatus(info) {
   }
 }
 
+
+async function initLocalDocuments() {
+  state.documentsManager = new KaloDocuments(state.user.id, {
+    onChanged: () => {
+      refreshStorageUi().catch(console.error);
+      if (state.currentView === 'documents') loadDocuments().catch(console.error);
+    },
+  });
+  await state.documentsManager.init();
+  await refreshStorageUi();
+}
+
+async function refreshStorageUi() {
+  if (!state.documentsManager) return;
+  const info = state.documentsManager.status();
+  const label = info.label || 'Bộ nhớ Kalo trên thiết bị';
+  if ($('#settingsStorageLabel')) $('#settingsStorageLabel').textContent = label;
+  if ($('#documentsStorageLabel')) $('#documentsStorageLabel').textContent = label;
+
+  const estimate = await state.documentsManager.storageEstimate();
+  const usage = estimate.usage || 0;
+  const quota = estimate.quota || 0;
+  const pct = quota > 0 ? Math.min(100, Math.round((usage / quota) * 100)) : 0;
+  if ($('#storageMeterBar')) $('#storageMeterBar').style.width = `${pct}%`;
+  if ($('#storageUsageText')) {
+    $('#storageUsageText').textContent = quota > 0
+      ? `Bộ nhớ trình duyệt đang dùng khoảng ${formatBytes(usage)} / ${formatBytes(quota)}. File trong thư mục ổ đĩa không tính vào con số này.`
+      : 'Kalo đang dùng bộ nhớ cục bộ của thiết bị.';
+  }
+}
+
+async function chooseStorageFolder() {
+  if (!state.documentsManager) return;
+  try {
+    const result = await state.documentsManager.chooseDirectory();
+    await refreshStorageUi();
+    await loadDocuments();
+    toast(result.mode === 'folder'
+      ? `Đã chuyển My Documents sang thư mục “${result.label}”.`
+      : 'Thiết bị này dùng bộ nhớ Kalo cục bộ.');
+  } catch (e) {
+    if (e?.name !== 'AbortError') toast(e.message || 'Không đổi được vị trí lưu trữ.', 'error');
+  }
+}
+
+function documentIcon(item) {
+  const type = item?.type || '';
+  const name = item?.name?.toLowerCase?.() || '';
+  if (type.startsWith('image/')) return '🖼';
+  if (type.startsWith('video/')) return '🎬';
+  if (type.startsWith('audio/')) return '🎵';
+  if (name.endsWith('.pdf')) return '📕';
+  if (/\.(doc|docx)$/i.test(name)) return '📘';
+  if (/\.(xls|xlsx|csv)$/i.test(name)) return '📗';
+  if (/\.(zip|rar|7z)$/i.test(name)) return '🗜';
+  return '📄';
+}
+
+async function loadDocuments() {
+  if (!state.documentsManager) return;
+  const query = state.currentView === 'documents' ? ($('#conversationSearch')?.value || '') : '';
+  try {
+    state.documentItems = await state.documentsManager.list(query);
+    renderDocumentsList();
+  } catch (e) {
+    state.documentItems = [];
+    renderDocumentsList();
+    toast(e.message || 'Không đọc được My Documents.', 'error');
+  }
+}
+
+function renderDocumentsList() {
+  const root = $('#documentsList');
+  if (!root) return;
+  root.innerHTML = state.documentItems.map((item) => `
+    <button class="document-row ${item.name === state.selectedDocumentName ? 'active' : ''}" type="button" data-document-name="${escapeHtml(item.name)}">
+      <span class="document-row-icon">${documentIcon(item)}</span>
+      <span class="document-row-main">
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${formatBytes(item.size)} · ${item.modified ? new Date(item.modified).toLocaleDateString('vi-VN') : ''}</small>
+      </span>
+    </button>`
+  ).join('') || '<div class="contact-empty">My Documents đang trống.<br>Bấm “Thêm file” để lưu file trên thiết bị này.</div>';
+
+  $('[data-document-name]', root).forEach((btn) => btn.addEventListener('click', () => {
+    selectDocument(btn.dataset.documentName);
+  }));
+}
+
+function selectDocument(name) {
+  const item = state.documentItems.find((x) => x.name === name);
+  if (!item) return;
+  state.selectedDocumentName = name;
+  renderDocumentsList();
+  const detail = $('#documentsDetail');
+  const canSend = !!state.currentConversationId;
+  detail.innerHTML = `
+    <div class="document-detail-card">
+      <div class="document-detail-icon">${documentIcon(item)}</div>
+      <h3>${escapeHtml(item.name)}</h3>
+      <p>${formatBytes(item.size)}${item.modified ? ` · ${new Date(item.modified).toLocaleString('vi-VN')}` : ''}</p>
+      <div class="document-detail-actions">
+        <button class="secondary-btn" data-doc-open type="button">Mở</button>
+        <button class="secondary-btn" data-doc-download type="button">Tải bản sao</button>
+        <button class="secondary-btn" data-doc-send type="button" ${canSend ? '' : 'disabled'}>Gửi vào chat hiện tại</button>
+        <button class="danger-btn" data-doc-delete type="button">Xóa</button>
+      </div>
+      ${canSend ? '' : '<small class="form-note">Chọn một cuộc trò chuyện trước nếu bạn muốn gửi file này.</small>'}
+    </div>`;
+  $('[data-doc-open]', detail)?.addEventListener('click', () => state.documentsManager.open(name).catch((e) => toast(e.message, 'error')));
+  $('[data-doc-download]', detail)?.addEventListener('click', () => state.documentsManager.download(name).catch((e) => toast(e.message, 'error')));
+  $('[data-doc-delete]', detail)?.addEventListener('click', async () => {
+    try {
+      await state.documentsManager.delete(name);
+      state.selectedDocumentName = null;
+      $('#documentsDetail').innerHTML = '<div class="documents-placeholder">Chọn một file ở bên trái để xem thao tác.</div>';
+      await loadDocuments();
+      toast('Đã xóa file khỏi My Documents.');
+    } catch (e) {
+      toast(e.message || 'Không xóa được file.', 'error');
+    }
+  });
+  $('[data-doc-send]', detail)?.addEventListener('click', async () => {
+    try {
+      const file = await state.documentsManager.getFile(name);
+      await sendTransferFile(file, file.type?.startsWith('image/') ? 'image' : 'file');
+      toast('Đã đưa file vào cuộc trò chuyện hiện tại.');
+    } catch (e) {
+      toast(e.message || 'Không gửi được file.', 'error');
+    }
+  });
+}
+
+async function addDocuments(files) {
+  if (!state.documentsManager || !files?.length) return;
+  for (const file of files) await state.documentsManager.saveFile(file);
+  await loadDocuments();
+  await refreshStorageUi();
+  toast(files.length > 1 ? `Đã thêm ${files.length} file vào My Documents.` : 'Đã thêm file vào My Documents.');
+}
+
+function showIncomingCall(incoming) {
+  state.incomingCall = incoming;
+  const name = profileName(incoming.peerId);
+  $('#incomingCallAvatar').textContent = initials(name);
+  $('#incomingCallName').textContent = name;
+  $('#incomingCallType').textContent = incoming.mode === 'video' ? 'Cuộc gọi video đến' : 'Cuộc gọi thoại đến';
+  show('#incomingCallModal');
+}
+
+function updateCallUi(session, status = 'Đang kết nối...') {
+  if (!session) return;
+  const name = profileName(session.peerId);
+  state.activeCall = session;
+  $('#callPeerName').textContent = name;
+  $('#activeCallName').textContent = name;
+  $('#activeCallAvatar').textContent = initials(name);
+  $('#callStatus').textContent = status;
+  $('#callModeLabel').textContent = session.mode === 'video' ? 'Gọi video' : 'Gọi thoại';
+  $('#cameraCallBtn').classList.toggle('hidden', session.mode !== 'video');
+  $('#audioCallPlaceholder').classList.toggle('hidden', session.mode === 'video');
+  $('#remoteCallVideo').classList.toggle('hidden', session.mode !== 'video');
+  $('#localCallVideo').classList.toggle('hidden', session.mode !== 'video');
+  if (session.localStream) $('#localCallVideo').srcObject = session.localStream;
+  show('#callModal');
+}
+
+function clearCallUi(message = '') {
+  state.activeCall = null;
+  state.incomingCall = null;
+  hide('#incomingCallModal');
+  hide('#callModal');
+  $('#remoteCallVideo').srcObject = null;
+  $('#remoteCallAudio').srcObject = null;
+  $('#localCallVideo').srcObject = null;
+  if (message) toast(message);
+}
+
+function callCallbacks() {
+  return {
+    onIncoming: showIncomingCall,
+    onOutgoing: ({ session }) => updateCallUi(session, 'Đang gọi...'),
+    onAccepted: ({ session }) => {
+      hide('#incomingCallModal');
+      updateCallUi(session, 'Đang kết nối...');
+    },
+    onRemoteStream: ({ session, stream }) => {
+      if (session.mode === 'video') $('#remoteCallVideo').srcObject = stream;
+      else $('#remoteCallAudio').srcObject = stream;
+    },
+    onConnected: ({ session }) => updateCallUi(session, 'Đã kết nối'),
+    onState: ({ session, state: connectionState }) => {
+      if (state.activeCall?.callId !== session.callId) return;
+      if (connectionState === 'connecting') $('#callStatus').textContent = 'Đang kết nối...';
+    },
+    onMediaState: ({ session }) => {
+      $('#muteCallBtn').classList.toggle('active', session.muted);
+      $('#muteCallBtn').textContent = session.muted ? '🔇' : '🎙';
+      $('#cameraCallBtn').classList.toggle('active', session.cameraOff);
+      $('#cameraCallBtn').textContent = session.cameraOff ? '🚫' : '📷';
+    },
+    onEnded: ({ reason }) => {
+      clearCallUi(reason === 'rejected' ? 'Người nhận đã từ chối cuộc gọi.' : '');
+    },
+    onError: ({ message }) => {
+      toast(message || 'Cuộc gọi gặp lỗi.', 'error');
+    },
+  };
+}
+
+async function startCurrentCall(mode) {
+  const conv = currentConversation();
+  const peerId = directPeerId(conv);
+  if (!peerId) {
+    toast('Hiện Kalo hỗ trợ gọi 1-1. Nhóm chưa hỗ trợ cuộc gọi.', 'error');
+    return;
+  }
+  if (!isOnline(peerId)) {
+    toast('Người này hiện không online nên chưa thể nhận cuộc gọi.', 'error');
+    return;
+  }
+  try {
+    const session = await state.callManager.startCall(peerId, mode);
+    updateCallUi(session, 'Đang gọi...');
+  } catch (e) {
+    toast(e.message || 'Không bắt đầu được cuộc gọi.', 'error');
+  }
+}
+
 async function startRealtime() {
   await stopRealtime();
   await startPresence();
@@ -411,8 +662,18 @@ async function startRealtime() {
     .subscribe();
   state.realtimeChannels.push(dataChannel);
 
-  state.fileManager = new KaloFileTransfer(supabase, state.user.id, { onStatus: onFileStatus });
+  state.fileManager = new KaloFileTransfer(supabase, state.user.id, {
+    onStatus: onFileStatus,
+    createReceiveTarget: (meta) => state.documentsManager?.createReceiveTarget(meta),
+    onReceived: () => {
+      if (state.currentView === 'documents') loadDocuments().catch(console.error);
+      refreshStorageUi().catch(console.error);
+    },
+  });
   await state.fileManager.start();
+
+  state.callManager = new KaloCallManager(supabase, state.user.id, callCallbacks());
+  await state.callManager.start();
 }
 
 async function loadProfiles() {
@@ -668,6 +929,9 @@ function renderChatHeader() {
   const title = conversationLabel(conv);
   $('#chatTitle').textContent = title;
   $('#chatAvatar').textContent = initials(title);
+  const direct = conv.kind === 'direct';
+  $('#audioCallBtn').classList.toggle('hidden', !direct);
+  $('#videoCallBtn').classList.toggle('hidden', !direct);
   if (conv.kind === 'group') {
     $('#chatSubtitle').textContent = `${memberIds(conv.id).length} thành viên`;
   } else {
@@ -743,8 +1007,11 @@ function renderMessages() {
 
 async function openConversation(id) {
   state.currentConversationId = id;
+  state.currentView = 'chats';
+  $('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === 'chats'));
   renderConversationList();
   renderChatHeader();
+  hide('#documentsHome');
   hide('#emptyChat');
   show('#activeChat');
   $('#appScreen').classList.add('chat-open');
@@ -1181,21 +1448,45 @@ function setView(view) {
   state.currentView = view;
   $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   const search = $('#conversationSearch');
+  hide('#conversationList');
+  hide('#peopleList');
+  hide('#documentsList');
+  hide('#addFriendBtn');
+  hide('#createGroupBtn');
+
+  if (view === 'documents') {
+    $('#leftPaneTitle').textContent = 'My Documents';
+    $('#onlineSummary').textContent = 'Lưu cục bộ trên thiết bị';
+    search.placeholder = 'Tìm file...';
+    show('#documentsList');
+    hide('#activeChat');
+    hide('#emptyChat');
+    show('#documentsHome');
+    loadDocuments().catch((e) => toast(e.message, 'error'));
+    refreshStorageUi().catch(console.error);
+    return;
+  }
+
+  hide('#documentsHome');
+  if (state.currentConversationId) {
+    show('#activeChat');
+    hide('#emptyChat');
+  } else {
+    hide('#activeChat');
+    show('#emptyChat');
+  }
+
   if (view === 'people') {
     $('#leftPaneTitle').textContent = 'Bạn bè';
     search.placeholder = 'Tìm bạn bè...';
     show('#addFriendBtn');
-    hide('#createGroupBtn');
-    hide('#conversationList');
     show('#peopleList');
     renderPeopleList();
   } else {
     $('#leftPaneTitle').textContent = 'Tin nhắn';
     search.placeholder = 'Tìm cuộc trò chuyện...';
-    hide('#addFriendBtn');
     show('#createGroupBtn');
     show('#conversationList');
-    hide('#peopleList');
     renderConversationList();
   }
   renderOnlineSummary();
@@ -1236,6 +1527,7 @@ async function startApp(session) {
     state.pendingRecoveryCode = null;
 
     await loadProfiles();
+    await initLocalDocuments();
     await Promise.all([loadFriendships(), loadConversations()]);
     await startRealtime();
 
@@ -1278,6 +1570,10 @@ async function logout() {
   state.conversations = [];
   state.members.clear();
   state.messages = [];
+  state.documentsManager = null;
+  state.documentItems = [];
+  state.selectedDocumentName = null;
+  clearCallUi();
   hide('#settingsModal');
   hide('#appScreen');
   show('#authScreen');
@@ -1443,6 +1739,7 @@ function bindAppEvents() {
   $$('.rail-btn[data-view]').forEach((btn) => btn.addEventListener('click', () => setView(btn.dataset.view)));
   $('#conversationSearch').addEventListener('input', () => {
     if (state.currentView === 'people') renderPeopleList();
+    else if (state.currentView === 'documents') loadDocuments().catch(console.error);
     else renderConversationList();
   });
 
@@ -1540,6 +1837,48 @@ function bindAppEvents() {
     if (file) await sendFile(file);
   });
 
+  $('#addDocumentBtn').addEventListener('click', () => $('#documentInput').click());
+  $('#documentInput').addEventListener('change', async (event) => {
+    const files = [...(event.target.files || [])];
+    event.target.value = '';
+    if (!files.length) return;
+    try { await addDocuments(files); }
+    catch (e) { toast(e.message || 'Không thêm được file.', 'error'); }
+  });
+  $('#documentsChangeFolderBtn').addEventListener('click', chooseStorageFolder);
+  $('#changeStorageBtn').addEventListener('click', chooseStorageFolder);
+
+  $('#audioCallBtn').addEventListener('click', () => startCurrentCall('audio'));
+  $('#videoCallBtn').addEventListener('click', () => startCurrentCall('video'));
+  $('#acceptCallBtn').addEventListener('click', async () => {
+    const incoming = state.incomingCall;
+    if (!incoming) return;
+    try {
+      const session = await state.callManager.accept(incoming.callId);
+      state.incomingCall = null;
+      hide('#incomingCallModal');
+      updateCallUi(session, 'Đang kết nối...');
+    } catch (e) {
+      toast(e.message || 'Không trả lời được cuộc gọi.', 'error');
+    }
+  });
+  $('#rejectCallBtn').addEventListener('click', async () => {
+    const incoming = state.incomingCall;
+    if (!incoming) return;
+    await state.callManager.reject(incoming.callId);
+    clearCallUi();
+  });
+  $('#hangupCallBtn').addEventListener('click', async () => {
+    if (state.activeCall) await state.callManager.hangup(state.activeCall);
+    clearCallUi();
+  });
+  $('#muteCallBtn').addEventListener('click', () => {
+    if (state.activeCall) state.callManager.toggleMute(state.activeCall);
+  });
+  $('#cameraCallBtn').addEventListener('click', () => {
+    if (state.activeCall) state.callManager.toggleCamera(state.activeCall);
+  });
+
   $('#privacyBtn').addEventListener('click', () => applyPrivacy(!document.body.classList.contains('privacy-mode')));
   $('#privacyToggle').addEventListener('change', (event) => applyPrivacy(event.target.checked));
 
@@ -1547,6 +1886,7 @@ function bindAppEvents() {
     $('#settingsAccount').textContent = `@${state.profile?.username || ''}`;
     $('#displayNameInput').value = state.profile?.display_name || '';
     $('#privacyToggle').checked = document.body.classList.contains('privacy-mode');
+    refreshStorageUi().catch(console.error);
     show('#settingsModal');
   });
 
@@ -1603,6 +1943,7 @@ function bindAppEvents() {
       return;
     }
     if (event.key === 'Escape') {
+      if (!$('#callModal').classList.contains('hidden')) return;
       if (closeTopModal()) return;
       if ($('#appScreen').classList.contains('chat-open') && window.innerWidth <= 720) {
         $('#appScreen').classList.remove('chat-open');
@@ -1616,6 +1957,7 @@ function bindAppEvents() {
 
   window.addEventListener('beforeunload', () => {
     try { state.fileManager?.stop(); } catch {}
+    try { state.callManager?.stop(); } catch {}
     try { state.qrScanner?.stop(); } catch {}
   });
 }
