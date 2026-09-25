@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.2.0" />
+  <link rel="stylesheet" href="./styles.css?v=1.3.0" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -82,6 +82,7 @@
       <div class="rail-main">
         <button class="rail-btn active" data-view="chats" type="button" title="Tin nhắn">💬<span>Tin</span></button>
         <button class="rail-btn" data-view="people" type="button" title="Danh bạ">👥<span>Bạn</span></button>
+        <button class="rail-btn" data-view="documents" type="button" title="My Documents">🗂<span>Tài liệu</span></button>
       </div>
       <div class="rail-bottom">
         <button id="privacyBtn" class="rail-btn" type="button" title="Che tin nhắn">🙈<span>Che</span></button>
@@ -103,6 +104,7 @@
       <div class="search-wrap"><input id="conversationSearch" placeholder="Tìm cuộc trò chuyện..." /></div>
       <div id="conversationList" class="conversation-list"></div>
       <div id="peopleList" class="conversation-list hidden"></div>
+      <div id="documentsList" class="conversation-list hidden"></div>
     </section>
 
     <section class="chat-pane">
@@ -112,6 +114,28 @@
         <p>Chọn một cuộc trò chuyện hoặc tạo cuộc trò chuyện mới.</p>
       </div>
 
+      <section id="documentsHome" class="documents-home hidden">
+        <div class="documents-hero">
+          <div class="documents-icon">🗂</div>
+          <div>
+            <h2>My Documents</h2>
+            <p>Ảnh và file lưu trực tiếp trên thiết bị của bạn.</p>
+          </div>
+          <button id="addDocumentBtn" class="primary-btn" type="button">＋ Thêm file</button>
+          <input id="documentInput" type="file" multiple hidden />
+        </div>
+        <div class="documents-storage-card">
+          <div>
+            <small>Vị trí lưu trữ</small>
+            <strong id="documentsStorageLabel">Đang kiểm tra...</strong>
+          </div>
+          <button id="documentsChangeFolderBtn" class="secondary-btn" type="button">Thay đổi</button>
+        </div>
+        <div id="documentsDetail" class="documents-detail">
+          <div class="documents-placeholder">Chọn một file ở bên trái để xem thao tác.</div>
+        </div>
+      </section>
+
       <div id="activeChat" class="active-chat hidden">
         <header class="chat-header">
           <div class="avatar" id="chatAvatar">K</div>
@@ -120,6 +144,8 @@
             <small id="chatSubtitle">Riêng tư</small>
           </div>
           <div class="chat-actions">
+            <button id="audioCallBtn" class="icon-btn" type="button" title="Gọi thoại">📞</button>
+            <button id="videoCallBtn" class="icon-btn" type="button" title="Gọi video">🎥</button>
             <button id="chatInfoBtn" class="icon-btn" type="button" title="Thông tin">ⓘ</button>
           </div>
         </header>
@@ -247,6 +273,19 @@
         <label>Nhập lại<input id="newPasswordInput2" type="password" minlength="8" /></label>
         <button class="secondary-btn" type="submit">Đổi mật khẩu</button>
       </form>
+      <div class="setting-block storage-setting">
+        <h4>Quản lý dữ liệu</h4>
+        <div class="storage-summary">
+          <div>
+            <small>Vị trí My Documents và file nhận</small>
+            <strong id="settingsStorageLabel">Đang kiểm tra...</strong>
+          </div>
+          <button id="changeStorageBtn" class="secondary-btn" type="button">Thay đổi</button>
+        </div>
+        <div class="storage-meter"><span id="storageMeterBar"></span></div>
+        <p id="storageUsageText" class="form-note">Đang tính dung lượng cục bộ...</p>
+        <p class="form-note">Trên Chrome/Edge máy tính, nút Thay đổi cho phép bạn chọn thư mục thật trên ổ đĩa. Trên thiết bị không hỗ trợ, Kalo dùng vùng lưu trữ riêng của trình duyệt.</p>
+      </div>
       <div class="setting-block">
         <h4>File lớn</h4>
         <p class="form-note">File được truyền trực tiếp giữa hai máy. Người gửi và người nhận cần cùng online. Kalo không lưu nội dung file trên máy chủ.</p>
@@ -255,9 +294,45 @@
     </section>
   </div>
 
+  <div id="incomingCallModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="call-incoming-card">
+      <div class="call-avatar" id="incomingCallAvatar">K</div>
+      <h3 id="incomingCallName">Cuộc gọi đến</h3>
+      <p id="incomingCallType">Đang gọi thoại...</p>
+      <div class="incoming-call-actions">
+        <button id="rejectCallBtn" class="call-circle danger" type="button" title="Từ chối">✕</button>
+        <button id="acceptCallBtn" class="call-circle accept" type="button" title="Trả lời">✓</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="callModal" class="call-screen hidden" role="dialog" aria-modal="true">
+    <div class="call-topbar">
+      <div>
+        <strong id="callPeerName">Cuộc gọi Kalo</strong>
+        <small id="callStatus">Đang kết nối...</small>
+      </div>
+      <span id="callModeLabel">Gọi thoại</span>
+    </div>
+    <div class="call-stage">
+      <video id="remoteCallVideo" autoplay playsinline></video>
+      <audio id="remoteCallAudio" autoplay></audio>
+      <div id="audioCallPlaceholder" class="audio-call-placeholder">
+        <div class="call-avatar large" id="activeCallAvatar">K</div>
+        <strong id="activeCallName">Kalo</strong>
+      </div>
+      <video id="localCallVideo" autoplay playsinline muted></video>
+    </div>
+    <div class="call-controls">
+      <button id="muteCallBtn" class="call-control" type="button" title="Tắt/bật mic">🎙</button>
+      <button id="cameraCallBtn" class="call-control" type="button" title="Tắt/bật camera">📷</button>
+      <button id="hangupCallBtn" class="call-control hangup" type="button" title="Kết thúc">☎</button>
+    </div>
+  </div>
+
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.2.0"></script>
+  <script type="module" src="./app.js?v=1.3.0"></script>
 </body>
 </html>
