@@ -89,6 +89,7 @@ const state = {
   contactAliases: {},
   avatarPendingDataUrl: '',
   avatarCrop: null,
+  avatarViewerZoom: 1,
   qrScanner: null,
 };
 
@@ -358,6 +359,16 @@ function avatarViewerProfile(userId) {
   return state.profiles.get(userId) || null;
 }
 
+function applyAvatarViewerZoom(nextZoom) {
+  const image = $('#avatarViewerImage');
+  const value = $('#avatarViewerZoomValue');
+  if (!image) return;
+  const zoom = Math.max(0.5, Math.min(5, Number(nextZoom) || 1));
+  state.avatarViewerZoom = zoom;
+  image.style.transform = `scale(${zoom})`;
+  if (value) value.textContent = `${Math.round(zoom * 100)}%`;
+}
+
 function openAvatarViewer(userId) {
   const profile = avatarViewerProfile(userId);
   const url = safeAvatarUrl(profile?.avatar_url);
@@ -371,11 +382,13 @@ function openAvatarViewer(userId) {
   $('#avatarViewerImage').src = url;
   $('#avatarViewerImage').alt = `Ảnh đại diện của ${name}`;
   $('#avatarViewerName').textContent = name;
+  applyAvatarViewerZoom(1);
   show('#avatarViewerModal');
 }
 
 function closeAvatarViewer() {
   hide('#avatarViewerModal');
+  applyAvatarViewerZoom(1);
   $('#avatarViewerImage').removeAttribute('src');
   $('#avatarViewerName').textContent = '';
 }
@@ -2998,6 +3011,16 @@ function bindAppEvents() {
   $('#closeAvatarViewerBtn').addEventListener('click', closeAvatarViewer);
   $('#avatarViewerModal').addEventListener('click', (event) => {
     if (event.target === $('#avatarViewerModal')) closeAvatarViewer();
+  });
+  $('#avatarViewerModal').addEventListener('wheel', (event) => {
+    if ($('#avatarViewerModal').classList.contains('hidden')) return;
+    event.preventDefault();
+    const step = event.deltaY < 0 ? 0.12 : -0.12;
+    applyAvatarViewerZoom(state.avatarViewerZoom + step);
+  }, { passive: false });
+  $('#avatarViewerImage').addEventListener('dblclick', (event) => {
+    event.preventDefault();
+    applyAvatarViewerZoom(1);
   });
 
   $('#settingsBtn').addEventListener('click', () => {
