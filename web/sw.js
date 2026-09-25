@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v17-avatar-viewer';
+const CACHE='kalo-native-v18-avatar-wheel-zoom';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.6.4',
-  './app.js?v=1.6.4',
+  './styles.css?v=1.6.5',
+  './app.js?v=1.6.5',
   './config.js',
   './crypto.js',
   './webrtc.js',
