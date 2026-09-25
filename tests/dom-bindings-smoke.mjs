@@ -82,6 +82,7 @@ const requiredIds = [
   'cancelAvatarCropBtn',
   'applyAvatarCropBtn',
   'closeAvatarCropBtn',
+  'scrollToLatestBtn',
 ];
 
 for (const id of requiredIds) {
@@ -110,6 +111,9 @@ if (!app.includes("saveOwnAvatar(")) throw new Error('Avatar profile save flow i
 if (!app.includes("applyAvatarCropPreview(")) throw new Error('Avatar crop preview flow is missing');
 if (!app.includes("pointermove")) throw new Error('Draggable avatar crop flow is missing');
 if (!app.includes("avatarPendingDataUrl")) throw new Error('Explicit avatar save staging is missing');
+if (!app.includes("scrollMessagesToLatest(")) throw new Error('Jump-to-latest message flow is missing');
+if (!app.includes("updateScrollToLatestButton(")) throw new Error('Jump-to-latest visibility flow is missing');
+if (!css.includes("#avatarCropModal")) throw new Error('Avatar crop priority styling is missing');
 if (!app.includes("contactAliasStorageKey(")) throw new Error('Private contact nickname storage is missing');
 if (!app.includes("openContactAliasModal(")) throw new Error('Contact nickname UI flow is missing');
 if (!html.includes('logout-icon-img')) throw new Error('Custom logout icon is missing');
