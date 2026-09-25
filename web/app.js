@@ -1743,7 +1743,7 @@ function renderMessages() {
   $$('[data-my-doc-download]', list).forEach((btn) => btn.addEventListener('click', () => {
     state.documentsManager.download(btn.dataset.myDocDownload).catch((e) => toast(e.message || 'Không tải được file.', 'error'));
   }));
-  $('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
     removeMyDocumentMessage(btn.dataset.myDocRemove).catch((e) => toast(e.message || 'Không xóa được nội dung.', 'error'));
   }));
   requestAnimationFrame(updateScrollToLatestButton);
