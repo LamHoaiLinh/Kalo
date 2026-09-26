@@ -328,6 +328,9 @@ function saveContactAliases() {
   const key = contactAliasStorageKey();
   if (!key) return;
   localStorage.setItem(key, JSON.stringify(state.contactAliases || {}));
+  state.preferencesManager?.replaceAliases(state.contactAliases).catch((error) => {
+    console.warn('Kalo alias sync failed', error);
+  });
 }
 
 function contactAlias(userId) {
@@ -592,12 +595,18 @@ function cancelAvatarCrop() {
 }
 
 async function saveOwnAvatar(avatarUrl) {
+  let storedUrl = '';
+  if (avatarUrl) {
+    storedUrl = await uploadAvatar(supabase, state.user.id, avatarUrl);
+  } else {
+    await removeAvatarObject(supabase, state.user.id).catch(() => {});
+  }
   const { error } = await supabase
     .from('kalo_profiles')
-    .update({ avatar_url: avatarUrl || null, updated_at: new Date().toISOString() })
+    .update({ avatar_url: storedUrl || null, updated_at: new Date().toISOString() })
     .eq('user_id', state.user.id);
   if (error) throw error;
-  state.profile.avatar_url = avatarUrl || null;
+  state.profile.avatar_url = storedUrl || null;
   state.avatarPendingDataUrl = '';
   closeAvatarCropSource();
   await loadProfiles();
@@ -671,10 +680,13 @@ function saveConversationCategories() {
   const key = categoryStorageKey();
   if (!key) return;
   localStorage.setItem(key, JSON.stringify({
-    version: 1,
+    version: 2,
     categories: state.conversationCategories,
     assignments: state.conversationCategoryMap,
   }));
+  state.preferencesManager?.replaceCategories(state.conversationCategories, state.conversationCategoryMap).catch((error) => {
+    console.warn('Kalo category sync failed', error);
+  });
 }
 
 function categoryById(id) {
@@ -792,6 +804,7 @@ function createConversationCategory(name, color) {
   const item = { id: crypto.randomUUID(), name: cleanName, color: safeCategoryColor(color) };
   state.conversationCategories.push(item);
   saveConversationCategories();
+  state.preferencesManager?.deleteCategory(categoryId).catch(() => {});
   renderCategoryManager();
   renderCategoryFilterMenu();
   renderConversationList();
@@ -816,6 +829,7 @@ function assignConversationCategory(conversationId, categoryId = '') {
   if (categoryId && categoryById(categoryId)) state.conversationCategoryMap[conversationId] = categoryId;
   else delete state.conversationCategoryMap[conversationId];
   saveConversationCategories();
+  state.preferencesManager?.setConversationCategory(conversationId, categoryId || null).catch(() => {});
   hide('#conversationCategoryMenu');
   renderConversationList();
 }
