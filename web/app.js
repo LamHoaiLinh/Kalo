@@ -884,6 +884,43 @@ function openConversationCategoryMenu(conversationId, anchor) {
   hide('#categoryFilterMenu');
 }
 
+async function reloadSyncedPreferences() {
+  if (!state.preferencesManager) return;
+  try {
+    const remote = await state.preferencesManager.load();
+    state.contactAliases = { ...(remote.aliases || {}) };
+    if ((remote.categories || []).length || state.conversationCategories.length === 0) {
+      state.conversationCategories = (remote.categories || []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        color: safeCategoryColor(item.color),
+      }));
+    }
+    state.conversationPrefs = { ...(remote.conversationPrefs || {}) };
+    state.conversationCategoryMap = Object.fromEntries(
+      Object.entries(state.conversationPrefs)
+        .filter(([, pref]) => pref?.category_id)
+        .map(([conversationId, pref]) => [conversationId, pref.category_id])
+    );
+    state.messagePins = remote.pins || [];
+    try {
+      localStorage.setItem(contactAliasStorageKey(), JSON.stringify(state.contactAliases));
+      localStorage.setItem(categoryStorageKey(), JSON.stringify({
+        version: 2,
+        categories: state.conversationCategories,
+        assignments: state.conversationCategoryMap,
+      }));
+    } catch {}
+    updateCategoryFilterButton();
+    renderConversationList();
+    renderPeopleList();
+    renderChatHeader();
+    renderMessages();
+  } catch (error) {
+    console.warn('Kalo preference realtime refresh failed', error);
+  }
+}
+
 async function hydrateSyncedPreferences() {
   if (!state.user) return;
   state.preferencesManager = new KaloPreferences(supabase, state.user.id);
@@ -1480,22 +1517,38 @@ async function startRealtime() {
 
   const dataChannel = supabase
     .channel(`kalo-data-${state.user.id}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'kalo_messages' }, async (payload) => {
-      const row = payload.new;
-      await loadProfiles().catch(() => {});
-      if (!state.conversations.some((c) => c.id === row.conversation_id)) {
-        await loadConversations();
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_messages' }, async (payload) => {
+      const row = payload.new || payload.old;
+      if (!row) return;
+      if (payload.eventType === 'INSERT') {
+        await loadProfiles().catch(() => {});
+        if (!state.conversations.some((conv) => conv.id === row.conversation_id)) {
+          await loadConversations();
+        }
+        notifyParentOfIncomingMessage(row);
       }
-      notifyParentOfIncomingMessage(row);
       if (row.conversation_id === state.currentConversationId) {
         await loadMessages(row.conversation_id);
       } else {
         await refreshPreviews();
+        await refreshUnreadCounts();
         renderConversationList();
       }
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_reactions' }, async () => {
-      if (state.currentConversationId) await loadReactions();
+      if (state.currentConversationId) {
+        await loadReactions();
+        renderMessages();
+      }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_reads' }, async (payload) => {
+      const row = payload.new || payload.old;
+      await refreshUnreadCounts();
+      if (row?.conversation_id === state.currentConversationId && state.messageService) {
+        state.currentReads = await state.messageService.reads(state.currentConversationId).catch(() => []);
+        renderMessages();
+      }
+      renderConversationList();
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_friendships' }, async () => {
       await loadFriendships();
@@ -1511,6 +1564,18 @@ async function startRealtime() {
       renderConversationList();
       renderChatHeader();
       renderMessages();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_contact_aliases', filter: `user_id=eq.${state.user.id}` }, reloadSyncedPreferences)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_categories', filter: `user_id=eq.${state.user.id}` }, reloadSyncedPreferences)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_conversation_prefs', filter: `user_id=eq.${state.user.id}` }, reloadSyncedPreferences)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_message_pins', filter: `user_id=eq.${state.user.id}` }, reloadSyncedPreferences)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_conversations' }, async () => {
+      await loadConversations();
+      await refreshUnreadCounts();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kalo_conversation_members' }, async () => {
+      await loadConversations();
+      await refreshUnreadCounts();
     })
     .subscribe();
   state.realtimeChannels.push(dataChannel);
@@ -1581,6 +1646,10 @@ async function refreshPreviews() {
   for (const row of data || []) {
     if (state.previews.has(row.conversation_id)) continue;
     try {
+      if (row.deleted_at) {
+        state.previews.set(row.conversation_id, { text: 'Tin nhắn đã xóa', created_at: row.created_at });
+        continue;
+      }
       const decoded = await decryptPayload(row.encrypted_payloads, state.user.id, state.identity);
       state.previews.set(row.conversation_id, {
         text:
