@@ -3716,7 +3716,9 @@ function bindAppEvents() {
     try {
       const prefs = await state.preferencesManager?.load().catch(() => null);
       const timeline = await state.documentsManager?.loadTimeline().catch(() => []);
-      downloadBackup({
+      const backupPassword = window.prompt('Mật khẩu bảo vệ file backup (có thể để trống):', '');
+      if (backupPassword === null) return;
+      await downloadBackup({
         app: 'Kalo',
         version: 2,
         exportedAt: new Date().toISOString(),
@@ -3740,8 +3742,8 @@ function bindAppEvents() {
           })(),
         },
         myDocumentsTimeline: timeline || [],
-      }, `Kalo_Backup_${state.profile?.username || 'user'}_${new Date().toISOString().slice(0,10)}.json`);
-      toast('Đã xuất backup Kalo.');
+      }, `Kalo_Backup_${state.profile?.username || 'user'}_${new Date().toISOString().slice(0,10)}.json`, backupPassword);
+      toast(backupPassword ? 'Đã xuất backup Kalo có mã hóa mật khẩu.' : 'Đã xuất backup Kalo.');
     } catch (error) {
       toast(error.message || 'Không xuất được backup.', 'error');
     }
@@ -3753,7 +3755,15 @@ function bindAppEvents() {
     event.target.value = '';
     if (!file) return;
     try {
-      const backup = await readBackupFile(file);
+      let backup;
+      try {
+        backup = await readBackupFile(file);
+      } catch (error) {
+        if (error?.code !== 'KALO_BACKUP_PASSWORD_REQUIRED') throw error;
+        const password = window.prompt('Nhập mật khẩu của file backup Kalo:', '');
+        if (password === null) return;
+        backup = await readBackupFile(file, password);
+      }
       if (backup.preferences?.aliases) {
         state.contactAliases = { ...backup.preferences.aliases };
         await state.preferencesManager?.replaceAliases(state.contactAliases);
