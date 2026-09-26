@@ -1990,6 +1990,7 @@ function renderMessages() {
 async function openConversation(id) {
   state.currentConversationId = id;
   state.currentView = 'chats';
+  clearReply();
   hide('#conversationCategoryMenu');
   closeMessageSearch(false);
   $$('.rail-btn[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === 'chats'));
@@ -1999,6 +2000,11 @@ async function openConversation(id) {
   hide('#emptyChat');
   show('#activeChat');
   $('#appScreen').classList.add('chat-open');
+  const draft = getDraft(state.user?.id, id);
+  const input = $('#messageInput');
+  input.value = draft;
+  input.style.height = 'auto';
+  input.style.height = `${Math.min(120, input.scrollHeight)}px`;
   await loadMessages(id);
 }
 
@@ -3235,6 +3241,10 @@ function bindAppEvents() {
   $('#messageInput').addEventListener('input', (event) => {
     event.currentTarget.style.height = 'auto';
     event.currentTarget.style.height = `${Math.min(120, event.currentTarget.scrollHeight)}px`;
+    if (state.currentView === 'chats' && state.currentConversationId) {
+      setDraft(state.user?.id, state.currentConversationId, event.currentTarget.value);
+      renderConversationList();
+    }
   });
   $('#messageInput').addEventListener('paste', async (event) => {
     const files = [...(event.clipboardData?.items || [])]
@@ -3267,8 +3277,19 @@ function bindAppEvents() {
   $('#messageSearchDate').addEventListener('change', () => runMessageSearch().catch(console.error));
 
   const messageList = $('#messageList');
-  messageList.addEventListener('scroll', updateScrollToLatestButton, { passive: true });
+  messageList.addEventListener('scroll', () => {
+    updateScrollToLatestButton();
+    if (messageList.scrollTop < 90 && state.currentView === 'chats') {
+      loadOlderMessages().catch(console.error);
+    }
+  }, { passive: true });
   $('#scrollToLatestBtn').addEventListener('click', () => scrollMessagesToLatest({ smooth: true }));
+  $('#cancelReplyBtn').addEventListener('click', clearReply);
+  $('#pinnedMessagesBtn').addEventListener('click', () => {
+    renderPinnedMessages();
+    show('#pinnedMessagesModal');
+  });
+  $('#forwardConversationSearch').addEventListener('input', renderForwardConversationList);
   window.addEventListener('resize', updateScrollToLatestButton);
 
   renderStickerGrid();
@@ -3381,6 +3402,10 @@ function bindAppEvents() {
     $('#displayNameInput').value = state.profile?.display_name || '';
     updateProfileAvatarPreview();
     $('#privacyToggle').checked = document.body.classList.contains('privacy-mode');
+    const turn = loadTurnConfig();
+    $('#turnUrlInput').value = turn?.url || '';
+    $('#turnUsernameInput').value = turn?.username || '';
+    $('#turnCredentialInput').value = turn?.credential || '';
     refreshStorageUi().catch(console.error);
     show('#settingsModal');
   });
@@ -3533,6 +3558,88 @@ function bindAppEvents() {
     $('#newPasswordInput').value = '';
     $('#newPasswordInput2').value = '';
     toast('Đã đổi mật khẩu.');
+  });
+
+  $('#saveTurnConfigBtn').addEventListener('click', () => {
+    const url = $('#turnUrlInput').value.trim();
+    saveTurnConfig(url ? {
+      url,
+      username: $('#turnUsernameInput').value,
+      credential: $('#turnCredentialInput').value,
+    } : null);
+    toast(url ? 'Đã lưu TURN. Kết nối mới sẽ dùng cấu hình này.' : 'Đã xóa cấu hình TURN.');
+  });
+
+  $('#exportBackupBtn').addEventListener('click', async () => {
+    try {
+      const prefs = await state.preferencesManager?.load().catch(() => null);
+      const timeline = await state.documentsManager?.loadTimeline().catch(() => []);
+      downloadBackup({
+        app: 'Kalo',
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        account: {
+          username: state.profile?.username || '',
+          displayName: state.profile?.display_name || '',
+        },
+        preferences: prefs || {
+          aliases: state.contactAliases,
+          categories: state.conversationCategories,
+          conversationPrefs: state.conversationPrefs,
+          pins: state.messagePins,
+        },
+        drafts: exportDrafts(state.user.id),
+        local: {
+          privacy: document.body.classList.contains('privacy-mode'),
+          rememberLogin: rememberLoginEnabled(),
+          turn: loadTurnConfig(),
+        },
+        myDocumentsTimeline: timeline || [],
+      }, `Kalo_Backup_${state.profile?.username || 'user'}_${new Date().toISOString().slice(0,10)}.json`);
+      toast('Đã xuất backup Kalo.');
+    } catch (error) {
+      toast(error.message || 'Không xuất được backup.', 'error');
+    }
+  });
+
+  $('#importBackupBtn').addEventListener('click', () => $('#backupImportInput').click());
+  $('#backupImportInput').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const backup = await readBackupFile(file);
+      if (backup.preferences?.aliases) {
+        state.contactAliases = { ...backup.preferences.aliases };
+        await state.preferencesManager?.replaceAliases(state.contactAliases);
+      }
+      if (Array.isArray(backup.preferences?.categories)) {
+        state.conversationCategories = backup.preferences.categories.map((item) => ({
+          id: item.id || crypto.randomUUID(),
+          name: String(item.name || 'Phân loại').slice(0,30),
+          color: safeCategoryColor(item.color),
+        }));
+        const assignments = Object.fromEntries(
+          Object.entries(backup.preferences?.conversationPrefs || {})
+            .filter(([, pref]) => pref?.category_id)
+            .map(([conversationId, pref]) => [conversationId, pref.category_id])
+        );
+        state.conversationCategoryMap = assignments;
+        await state.preferencesManager?.replaceCategories(state.conversationCategories, assignments);
+      }
+      importDrafts(state.user.id, backup.drafts || {});
+      if (Array.isArray(backup.myDocumentsTimeline) && state.documentsManager) {
+        await state.documentsManager.saveTimeline(backup.myDocumentsTimeline);
+      }
+      if (backup.local?.turn) saveTurnConfig(backup.local.turn);
+      if (typeof backup.local?.privacy === 'boolean') applyPrivacy(backup.local.privacy);
+      await hydrateSyncedPreferences();
+      renderConversationList();
+      renderCategoryFilterMenu();
+      toast('Đã khôi phục backup Kalo.');
+    } catch (error) {
+      toast(error.message || 'Không nhập được backup.', 'error');
+    }
   });
 
   $('#logoutBtn').addEventListener('click', logout);
