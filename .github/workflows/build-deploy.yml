@@ -36,6 +36,11 @@ jobs:
           node --check web/webrtc.js
           node --check web/storage.js
           node --check web/call.js
+          node --check web/preferences.js
+          node --check web/message-service.js
+          node --check web/media-storage.js
+          node --check web/backup.js
+          node --check web/rtc-config.js
           node --check web/app.js
           node --check web/sw.js
 
@@ -50,6 +55,11 @@ jobs:
           test -s web/webrtc.js
           test -s web/storage.js
           test -s web/call.js
+          test -s web/preferences.js
+          test -s web/message-service.js
+          test -s web/media-storage.js
+          test -s web/backup.js
+          test -s web/rtc-config.js
           grep -q 'Kalo' web/index.html
           grep -q 'Tạo tài khoản' web/index.html
           grep -q 'Quên mật khẩu' web/index.html
