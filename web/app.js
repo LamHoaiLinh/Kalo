@@ -1673,14 +1673,9 @@ async function loadConversations() {
 
 async function refreshPreviews() {
   state.previews.clear();
-  const ids = state.conversations.map((c) => c.id);
+  const ids = state.conversations.map((conv) => conv.id);
   if (!ids.length || !state.identity) return;
-  const { data, error } = await supabase
-    .from('kalo_messages')
-    .select('id,conversation_id,sender_id,kind,encrypted_payloads,created_at,deleted_at')
-    .in('conversation_id', ids)
-    .order('created_at', { ascending: false })
-    .limit(500);
+  const { data, error } = await supabase.rpc('kalo_latest_messages');
   if (error) return;
   for (const row of data || []) {
     if (state.previews.has(row.conversation_id)) continue;
