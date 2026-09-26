@@ -52,6 +52,38 @@ export class KaloMessageService {
     };
   }
 
+  async around(conversationId, messageId, radius = 40) {
+    const targetRes = await this.supabase.from('kalo_messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .eq('id', messageId)
+      .maybeSingle();
+    if (targetRes.error) throw targetRes.error;
+    const target = targetRes.data;
+    if (!target) return [];
+
+    const [beforeRes, afterRes] = await Promise.all([
+      this.supabase.from('kalo_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .lte('created_at', target.created_at)
+        .order('created_at', { ascending: false })
+        .limit(radius + 1),
+      this.supabase.from('kalo_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .gt('created_at', target.created_at)
+        .order('created_at', { ascending: true })
+        .limit(radius),
+    ]);
+    if (beforeRes.error) throw beforeRes.error;
+    if (afterRes.error) throw afterRes.error;
+    const rows = [...(beforeRes.data || []).reverse(), ...(afterRes.data || [])];
+    const unique = [...new Map(rows.map((row) => [row.id, row])).values()]
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    return decodeRows(unique, this.userId, this.identity);
+  }
+
   async reads(conversationId) {
     const { data, error } = await this.supabase.from('kalo_reads')
       .select('conversation_id,user_id,last_message_id,read_at')
