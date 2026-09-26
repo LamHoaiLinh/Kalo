@@ -777,7 +777,7 @@ function renderCategoryManager() {
     </div>
   `).join('') || '<div class="category-empty">Chưa có phân loại. Hãy tạo một thẻ mới ở phía trên.</div>';
 
-  $('[data-category-color]', root).forEach((input) => {
+  $$('[data-category-color]', root).forEach((input) => {
     input.addEventListener('input', () => {
       const item = categoryById(input.dataset.categoryColor);
       if (!item) return;
