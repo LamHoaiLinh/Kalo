@@ -1,4 +1,4 @@
-import { RTC_CONFIG } from './config.js';
+import { getRtcConfig } from './rtc-config.js';
 
 function sessionKey(callId, peerId) {
   return `${callId}:${peerId}`;
@@ -78,8 +78,22 @@ export class KaloCallManager {
     });
   }
 
+  scheduleConnectionGuard(session) {
+    clearTimeout(session.guardTimer);
+    session.guardTimer = setTimeout(async () => {
+      const state = session.pc?.connectionState;
+      if (!['new','connecting','disconnected'].includes(state)) return;
+      try {
+        if (session.role === 'caller') await this.createOffer(session, true);
+        this.emit('onState', { session, state: 'retrying' });
+      } catch (error) {
+        console.warn('Kalo call ICE restart failed', error);
+      }
+    }, 12000);
+  }
+
   async createSession(callId, peerId, mode, role, stream) {
-    const pc = new RTCPeerConnection(RTC_CONFIG);
+    const pc = new RTCPeerConnection(getRtcConfig());
     const session = {
       callId,
       peerId,
@@ -92,6 +106,7 @@ export class KaloCallManager {
       cameraOff: mode !== 'video',
     };
     this.sessions.set(sessionKey(callId, peerId), session);
+    this.scheduleConnectionGuard(session);
 
     for (const track of stream.getTracks()) pc.addTrack(track, stream);
 
@@ -112,7 +127,8 @@ export class KaloCallManager {
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       this.emit('onState', { session, state });
-      if (state === 'connected') this.emit('onConnected', { session });
+      if (state === 'connected') { clearTimeout(session.guardTimer); this.emit('onConnected', { session }); }
+      if (state === 'disconnected') this.scheduleConnectionGuard(session);
       if (['failed', 'closed', 'disconnected'].includes(state)) {
         if (state === 'failed') {
           this.emit('onError', {
@@ -172,8 +188,8 @@ export class KaloCallManager {
     this.emit('onEnded', { callId, reason: 'rejected' });
   }
 
-  async createOffer(session) {
-    const offer = await session.pc.createOffer();
+  async createOffer(session, iceRestart = false) {
+    const offer = await session.pc.createOffer(iceRestart ? { iceRestart: true } : undefined);
     await session.pc.setLocalDescription(offer);
     await this.send(session.callId, session.peerId, 'offer', {
       description: session.pc.localDescription,
@@ -191,6 +207,7 @@ export class KaloCallManager {
   closeSession(session, emit = true) {
     try { session.localStream?.getTracks().forEach((t) => t.stop()); } catch {}
     try { session.remoteStream?.getTracks().forEach((t) => t.stop()); } catch {}
+    clearTimeout(session.guardTimer);
     try { session.pc?.close(); } catch {}
     this.sessions.delete(sessionKey(session.callId, session.peerId));
     if (emit) this.emit('onEnded', { session, reason: 'hangup' });
