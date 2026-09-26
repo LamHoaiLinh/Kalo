@@ -1873,15 +1873,30 @@ function renderMessages() {
     const reactions = state.reactions.get(m.id) || [];
     const hearts = reactions.filter((r) => r.emoji === '❤️');
     const mine = hearts.some((r) => r.user_id === state.user.id);
+    const deleted = Boolean(m.deleted_at);
+    const pinned = isMessagePinned(m.id);
+    const replyTarget = m.reply_to ? state.messages.find((x) => x.id === m.reply_to) : null;
+    const replyHtml = m.reply_to
+      ? `<button class="reply-quote" type="button" data-reply-jump="${m.reply_to}">
+          <strong>${escapeHtml(replyTarget ? profileName(replyTarget.sender_id) : 'Tin nhắn trước')}</strong>
+          <span>${escapeHtml(replyTarget ? messageActionText(replyTarget).slice(0, 130) : 'Tin nhắn cũ chưa được tải')}</span>
+        </button>`
+      : '';
+    const forwardedHtml = m.decoded?.forwarded
+      ? `<div class="forwarded-label">↗ Chuyển tiếp${m.decoded.originalSender ? ` từ ${escapeHtml(m.decoded.originalSender)}` : ''}</div>`
+      : '';
     let body = '';
 
-    if (m.decoded.type === 'locked') {
+    if (deleted) {
+      body = '<div class="bubble-text deleted-message">Tin nhắn đã được xóa.</div>';
+    } else if (m.decoded.type === 'locked') {
       body = `<div class="bubble-text">${escapeHtml(m.decoded.text)}</div>`;
     } else if (m.decoded.type === 'sticker') {
       body = `<div class="sticker-message" aria-label="Sticker">${escapeHtml(m.decoded.sticker || '🙂')}</div>`;
     } else if (m.decoded.type === 'image') {
       const local = Boolean(m.localDocument);
       const canReceive = !local && !own;
+      const hasRelay = Boolean(m.decoded.relay);
       const preview = typeof m.decoded.thumbnail === 'string' && m.decoded.thumbnail.startsWith('data:image/')
         ? `<img class="image-preview" src="${escapeHtml(m.decoded.thumbnail)}" alt="${escapeHtml(m.decoded.name || 'Ảnh')}" />`
         : '<div class="image-preview-placeholder">🖼</div>';
@@ -1890,60 +1905,83 @@ function renderMessages() {
         <div class="file-card-head image-meta">
           <div style="min-width:0">
             <div class="file-name">${escapeHtml(m.decoded.name || 'Ảnh')}</div>
-            <div class="file-size">${escapeHtml(formatBytes(m.decoded.size))} · ${local ? 'lưu trên thiết bị' : 'ảnh gốc truyền trực tiếp'}</div>
+            <div class="file-size">${escapeHtml(formatBytes(m.decoded.size))} · ${local ? 'lưu trên thiết bị' : (hasRelay ? 'relay mã hóa + P2P' : 'P2P trực tiếp')}</div>
           </div>
         </div>
         ${local ? `<div class="my-doc-file-actions">
           <button class="secondary-btn" data-my-doc-open="${escapeHtml(m.decoded.fileName)}" type="button">Mở</button>
           <button class="secondary-btn" data-my-doc-download="${escapeHtml(m.decoded.fileName)}" type="button">Tải bản sao</button>
-        </div>` : (canReceive ? `<button class="secondary-btn" data-receive-file="${m.id}" type="button">Nhận ảnh gốc</button>` : '<div class="file-size" style="margin-top:8px">Giữ Kalo mở để người nhận lấy ảnh gốc.</div>')}
+        </div>` : (canReceive ? `<button class="secondary-btn" data-receive-file="${m.id}" type="button">${hasRelay ? 'Tải ảnh gốc' : 'Nhận ảnh gốc'}</button>` : `<div class="file-size" style="margin-top:8px">${hasRelay ? 'Người nhận có thể tải file mã hóa ngay cả khi bạn offline.' : 'Giữ Kalo mở để người nhận lấy ảnh gốc.'}</div>`)}
       </div>`;
     } else if (m.kind === 'file_offer' || m.decoded.type === 'file') {
       const local = Boolean(m.localDocument);
       const canReceive = !local && !own;
+      const hasRelay = Boolean(m.decoded.relay);
       body = `<div class="file-card">
         <div class="file-card-head">
           <div class="file-icon">📎</div>
           <div style="min-width:0">
             <div class="file-name">${escapeHtml(m.decoded.name || 'File')}</div>
-            <div class="file-size">${escapeHtml(formatBytes(m.decoded.size))} · ${local ? 'lưu trên thiết bị' : 'truyền trực tiếp'}</div>
+            <div class="file-size">${escapeHtml(formatBytes(m.decoded.size))} · ${local ? 'lưu trên thiết bị' : (hasRelay ? 'relay mã hóa + P2P' : 'P2P trực tiếp')}</div>
           </div>
         </div>
         ${local ? `<div class="my-doc-file-actions">
           <button class="secondary-btn" data-my-doc-open="${escapeHtml(m.decoded.fileName)}" type="button">Mở</button>
           <button class="secondary-btn" data-my-doc-download="${escapeHtml(m.decoded.fileName)}" type="button">Tải bản sao</button>
-        </div>` : (canReceive ? `<button class="secondary-btn" data-receive-file="${m.id}" type="button">Nhận file</button>` : '<div class="file-size" style="margin-top:8px">Giữ Kalo mở để người nhận tải file.</div>')}
+        </div>` : (canReceive ? `<button class="secondary-btn" data-receive-file="${m.id}" type="button">${hasRelay ? 'Tải file' : 'Nhận file'}</button>` : `<div class="file-size" style="margin-top:8px">${hasRelay ? 'Đã có bản relay mã hóa tạm thời.' : 'Giữ Kalo mở để người nhận tải file.'}</div>`)}
       </div>`;
     } else {
       body = `<div class="bubble-text">${escapeHtml(m.decoded.text || '')}</div>`;
     }
 
+    const seen = own && !m.localDocument && state.currentReads.some((read) =>
+      read.user_id !== state.user.id && new Date(read.read_at).getTime() >= new Date(m.created_at).getTime()
+    );
+    const timeBits = [
+      formatTime(m.created_at),
+      m.edited_at ? 'đã sửa' : '',
+      seen ? 'Đã xem' : '',
+    ].filter(Boolean).join(' · ');
+
+    const actions = m.localDocument
+      ? `<button class="my-doc-delete-btn" data-my-doc-remove="${m.id}" type="button" title="Xóa khỏi My Documents">🗑 Xóa khỏi My Documents</button>`
+      : `${!deleted ? `<button class="mini-action" data-heart="${m.id}" type="button" title="Thả tim">${mine ? '❤️' : '♡'} ${hearts.length || ''}</button>
+          <button class="mini-action" data-reply="${m.id}" type="button" title="Trả lời">↩</button>
+          <button class="mini-action ${pinned ? 'active' : ''}" data-pin="${m.id}" type="button" title="${pinned ? 'Bỏ ghim' : 'Ghim'}">📌</button>
+          <button class="mini-action" data-forward="${m.id}" type="button" title="Chuyển tiếp">↗</button>` : ''}
+        ${own && !deleted && m.decoded?.type === 'text' ? `<button class="mini-action" data-edit="${m.id}" type="button" title="Sửa">✎</button>` : ''}
+        ${own && !deleted ? `<button class="mini-action danger" data-delete-message="${m.id}" type="button" title="Xóa">🗑</button>` : ''}`;
+
     return `<div class="msg-row ${own ? 'own' : 'other'}" data-message-id="${m.id}">
       ${own ? '' : `<div class="msg-avatar ${safeAvatarUrl(sender?.avatar_url) ? 'has-image avatar-clickable' : ''}" data-avatar-user="${escapeHtml(m.sender_id)}" ${safeAvatarUrl(sender?.avatar_url) ? 'title="Bấm để xem ảnh đại diện"' : ''}>${avatarContent(sender, profileName(m.sender_id))}</div>`}
       <div class="msg-content">
         ${own ? '' : `<div class="msg-sender">${escapeHtml(profileName(m.sender_id))}</div>`}
-        <div class="bubble">
+        <div class="bubble ${pinned ? 'pinned' : ''}">
+          ${forwardedHtml}
+          ${replyHtml}
           ${body}
-          <div class="bubble-time">${escapeHtml(formatTime(m.created_at))}</div>
+          <div class="bubble-time">${escapeHtml(timeBits)}</div>
         </div>
-        <div class="msg-actions">
-          ${m.localDocument
-            ? `<button class="my-doc-delete-btn" data-my-doc-remove="${m.id}" type="button" title="Xóa khỏi My Documents">🗑 Xóa khỏi My Documents</button>`
-            : `<button class="mini-action" data-heart="${m.id}" type="button">${mine ? '❤️' : '♡'} ${hearts.length || ''}</button>`}
-        </div>
+        <div class="msg-actions">${actions}</div>
       </div>
     </div>`;
   }).join('');
 
-  $$('[data-heart]', list).forEach((btn) => btn.addEventListener('click', () => toggleHeart(btn.dataset.heart)));
-  $$('[data-receive-file]', list).forEach((btn) => btn.addEventListener('click', () => receiveFile(btn.dataset.receiveFile)));
-  $$('[data-my-doc-open]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-heart]', list).forEach((btn) => btn.addEventListener('click', () => toggleHeart(btn.dataset.heart)));
+  $('[data-reply]', list).forEach((btn) => btn.addEventListener('click', () => startReply(btn.dataset.reply)));
+  $('[data-edit]', list).forEach((btn) => btn.addEventListener('click', () => editMessage(btn.dataset.edit).catch((e) => toast(e.message || 'Không sửa được tin.', 'error'))));
+  $('[data-delete-message]', list).forEach((btn) => btn.addEventListener('click', () => deleteMessage(btn.dataset.deleteMessage).catch((e) => toast(e.message || 'Không xóa được tin.', 'error'))));
+  $('[data-pin]', list).forEach((btn) => btn.addEventListener('click', () => toggleMessagePin(btn.dataset.pin).catch((e) => toast(e.message || 'Không ghim được tin.', 'error'))));
+  $('[data-forward]', list).forEach((btn) => btn.addEventListener('click', () => openForwardMessage(btn.dataset.forward)));
+  $('[data-reply-jump]', list).forEach((btn) => btn.addEventListener('click', () => jumpToSearchMessage(btn.dataset.replyJump)));
+  $('[data-receive-file]', list).forEach((btn) => btn.addEventListener('click', () => receiveFile(btn.dataset.receiveFile)));
+  $('[data-my-doc-open]', list).forEach((btn) => btn.addEventListener('click', () => {
     state.documentsManager.open(btn.dataset.myDocOpen).catch((e) => toast(e.message || 'Không mở được file.', 'error'));
   }));
-  $$('[data-my-doc-download]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-my-doc-download]', list).forEach((btn) => btn.addEventListener('click', () => {
     state.documentsManager.download(btn.dataset.myDocDownload).catch((e) => toast(e.message || 'Không tải được file.', 'error'));
   }));
-  $$('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
     removeMyDocumentMessage(btn.dataset.myDocRemove).catch((e) => toast(e.message || 'Không xóa được nội dung.', 'error'));
   }));
   requestAnimationFrame(updateScrollToLatestButton);
