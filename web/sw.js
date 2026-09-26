@@ -1,14 +1,19 @@
-const CACHE='kalo-native-v18-avatar-wheel-zoom';
+const CACHE='kalo-native-v19-v17-stability';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.6.5',
-  './app.js?v=1.6.5',
+  './styles.css?v=1.7.0',
+  './app.js?v=1.7.0',
   './config.js',
   './crypto.js',
   './webrtc.js',
   './storage.js',
   './call.js',
+  './rtc-config.js',
+  './backup.js',
+  './media-storage.js',
+  './message-service.js',
+  './preferences.js',
   './vendor/qrcode.min.js',
   './vendor/qr-scanner.min.js',
   './vendor/qr-scanner-worker.min.js',
