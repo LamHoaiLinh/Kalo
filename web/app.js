@@ -2500,7 +2500,7 @@ function renderPinnedMessages() {
   }).join('') || '<div class="category-empty">Chưa có tin nhắn nào được ghim.</div>';
   $('[data-pinned-jump]', root).forEach((btn) => btn.addEventListener('click', () => {
     hide('#pinnedMessagesModal');
-    jumpToSearchMessage(btn.dataset.pinnedJump);
+    jumpToMessageById(btn.dataset.pinnedJump).catch((e) => toast(e.message || 'Không mở được tin đã ghim.', 'error'));
   }));
 }
 
@@ -2949,6 +2949,26 @@ async function runMessageSearch() {
     $('#messageSearchResults').innerHTML = '';
     toast(e.message || 'Không tìm được tin nhắn.', 'error');
   }
+}
+
+async function jumpToMessageById(messageId) {
+  if (!messageId || !state.currentConversationId || !state.messageService) return;
+  let row = $('[data-message-id="' + CSS.escape(messageId) + '"]', $('#messageList'));
+  if (!row) {
+    const around = await state.messageService.around(state.currentConversationId, messageId, 40);
+    if (!around.length) {
+      toast('Không tìm thấy tin nhắn này.', 'error');
+      return;
+    }
+    state.messages = around;
+    await loadReactions();
+    renderMessages();
+    row = $('[data-message-id="' + CSS.escape(messageId) + '"]', $('#messageList'));
+  }
+  if (!row) return;
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  row.classList.add('search-hit');
+  setTimeout(() => row.classList.remove('search-hit'), 1800);
 }
 
 function jumpToSearchMessage(messageId) {
