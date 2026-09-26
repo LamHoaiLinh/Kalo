@@ -12,26 +12,32 @@ Kalo là ứng dụng trò chuyện web/PWA dành cho **gia đình, đồng nghi
 
 ## Chức năng
 
-- Đăng ký bằng **ID + mật khẩu + nhập lại mật khẩu**.
-- Email khôi phục là tùy chọn, không bắt buộc.
-- Không gửi email thông báo chat.
-- Email khôi phục chỉ được gửi khi người dùng chủ động yêu cầu và được giới hạn tối đa 1 yêu cầu / 10 phút.
-- Mỗi tài khoản có **mã khôi phục Kalo** để tạo lại mật khẩu mà không cần email.
-- Chat 1-1 và nhóm.
-- Tin nhắn được mã hóa ở trình duyệt trước khi lưu lên server.
-- Thả tim tin nhắn.
-- Trạng thái online.
-- Chế độ **Che tin nhắn**.
-- File lớn truyền **trực tiếp máy gửi → máy nhận bằng WebRTC**; nội dung file không lưu trong Supabase.
-- Người gửi và người nhận phải cùng online để truyền file.
-- Với Chrome/Edge trên máy tính, file nhận có thể được ghi thẳng xuống ổ đĩa thay vì giữ toàn bộ trong RAM.
+- Đăng ký bằng **ID + mật khẩu + nhập lại mật khẩu**; email khôi phục là tùy chọn.
+- Mỗi tài khoản có **mã khôi phục Kalo** để tạo lại mật khẩu và mở khóa lịch sử E2EE trên thiết bị mới.
+- Chat 1-1 và nhóm; tin nhắn được mã hóa ở trình duyệt trước khi lưu lên server.
+- Lịch sử chat tải theo trang: mở 100 tin gần nhất, cuộn lên đầu để nạp tiếp tin cũ.
+- Tin chưa đọc và trạng thái **Đã gửi / Đã xem** đồng bộ qua `kalo_reads`.
+- Trả lời, sửa, xóa, chuyển tiếp, thả tim và ghim tin nhắn.
+- Draft được lưu riêng theo từng cuộc trò chuyện.
+- Biệt danh, phân loại, ghim/tắt thông báo/lưu trữ cuộc trò chuyện được đồng bộ theo tài khoản.
+- Avatar lưu trong Supabase Storage thay vì nhúng base64 vào bảng profile.
+- File lớn truyền **P2P qua WebRTC**; file/ảnh ≤ 10 MB có thể kèm bản relay **AES-GCM** tạm thời để tải khi máy gửi đã offline.
+- Có cấu hình TURN tùy chọn và ICE restart để tăng độ ổn định ở NAT/mạng công ty.
+- Backup/restore biệt danh, phân loại, ghim, draft, cài đặt và timeline My Documents; có thể bảo vệ backup bằng mật khẩu AES-GCM.
+- My Documents vẫn lưu cục bộ trên thiết bị; backup không nhúng file nhị phân và không xuất khóa mã hóa tin nhắn.
+- Chế độ **Che tin nhắn**; `Alt+.` bật/tắt nhanh.
 - `Alt+K` mở Kalo trong Kanban; `Esc` quay về Kanban.
 
 ## Cấu trúc
 
 - `web/index.html` — giao diện.
 - `web/styles.css` — giao diện xanh lá pastel.
-- `web/app.js` — tài khoản, chat, nhóm, reaction, realtime.
+- `web/app.js` — điều phối UI và các luồng nghiệp vụ chính.
+- `web/message-service.js` — phân trang lịch sử, read/unread.
+- `web/preferences.js` — biệt danh, phân loại, pin/mute/archive và draft.
+- `web/media-storage.js` — avatar Storage và relay file nhỏ mã hóa.
+- `web/backup.js` — backup/restore, mã hóa backup tùy chọn.
+- `web/rtc-config.js` — cấu hình STUN/TURN runtime.
 - `web/crypto.js` — mã hóa/giải mã phía người dùng và khóa bảo mật.
 - `web/webrtc.js` — truyền file P2P.
 - `web/config.js` — cấu hình frontend.
@@ -60,3 +66,10 @@ Kalo không upload file chat vào Supabase Storage. Supabase chỉ chuyển tín
 ## Giấy phép
 
 Kalo hiện được phát hành theo giấy phép AGPL-3.0 trong file `LICENSE`.
+
+
+## Kalo v1.7
+
+V1.7 tập trung vào ổn định dài hạn: sửa giới hạn lịch sử cũ, tách các service khỏi `app.js`, đồng bộ preference nhiều thiết bị, đưa avatar ra Storage, bổ sung relay file nhỏ mã hóa, TURN tùy chọn và backup có mật khẩu.
+
+Migration Supabase tương ứng được lưu tại `supabase/migrations/202609260001_kalo_v17_stability.sql`.
