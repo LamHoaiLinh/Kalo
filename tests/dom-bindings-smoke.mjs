@@ -90,6 +90,22 @@ const requiredIds = [
   'avatarViewerName',
   'closeAvatarViewerBtn',
   'avatarViewerZoomValue',
+  'pinnedMessagesBtn',
+  'replyComposerBar',
+  'replyComposerText',
+  'cancelReplyBtn',
+  'pinnedMessagesModal',
+  'pinnedMessagesList',
+  'forwardMessageModal',
+  'forwardConversationSearch',
+  'forwardConversationList',
+  'turnUrlInput',
+  'turnUsernameInput',
+  'turnCredentialInput',
+  'saveTurnConfigBtn',
+  'exportBackupBtn',
+  'importBackupBtn',
+  'backupImportInput',
 ];
 
 for (const id of requiredIds) {
@@ -134,5 +150,17 @@ if (!app.includes("openContactAliasModal(")) throw new Error('Contact nickname U
 if (!html.includes('logout-icon-img')) throw new Error('Custom logout icon is missing');
 if (!app.includes("function returnToKanban(")) throw new Error('Standalone return-to-Kanban action is missing');
 if (!html.includes('id="imageBtn"') || !html.includes('compose-tool-image')) throw new Error('Custom image composer icon is missing');
+if (!app.includes("new KaloMessageService(")) throw new Error('Paged message service is missing');
+if (!app.includes("loadOlderMessages(")) throw new Error('Paged history loader is missing');
+if (!app.includes("refreshUnreadCounts(")) throw new Error('Unread synchronization is missing');
+if (!app.includes("startReply(") || !app.includes("editMessage(") || !app.includes("deleteMessage(")) throw new Error('Core message actions are missing');
+if (!app.includes("toggleMessagePin(") || !app.includes("openForwardMessage(")) throw new Error('Pin/forward message actions are missing');
+if (!app.includes("getDraft(") || !app.includes("setDraft(")) throw new Error('Per-chat draft flow is missing');
+if (!app.includes("hydrateSyncedPreferences(")) throw new Error('Cross-device preference sync is missing');
+if (!app.includes("uploadAvatar(")) throw new Error('Supabase avatar storage migration is missing');
+if (!app.includes("uploadEncryptedRelay(") || !app.includes("downloadEncryptedRelay(")) throw new Error('Encrypted small-file relay is missing');
+if (!app.includes("loadTurnConfig(") || !app.includes("saveTurnConfig(")) throw new Error('TURN configuration UI is missing');
+if (!app.includes("downloadBackup(") || !app.includes("readBackupFile(")) throw new Error('Backup/restore flow is missing');
+if (!app.includes("setConversationPreferenceFlag(")) throw new Error('Conversation pin/mute/archive sync is missing');
 
 console.log('Kalo DOM binding smoke test passed.');
