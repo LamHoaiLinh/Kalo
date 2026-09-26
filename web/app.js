@@ -2088,21 +2088,21 @@ function renderMessages() {
     </div>`;
   }).join('');
 
-  $('[data-heart]', list).forEach((btn) => btn.addEventListener('click', () => toggleHeart(btn.dataset.heart)));
-  $('[data-reply]', list).forEach((btn) => btn.addEventListener('click', () => startReply(btn.dataset.reply)));
-  $('[data-edit]', list).forEach((btn) => btn.addEventListener('click', () => editMessage(btn.dataset.edit).catch((e) => toast(e.message || 'Không sửa được tin.', 'error'))));
-  $('[data-delete-message]', list).forEach((btn) => btn.addEventListener('click', () => deleteMessage(btn.dataset.deleteMessage).catch((e) => toast(e.message || 'Không xóa được tin.', 'error'))));
-  $('[data-pin]', list).forEach((btn) => btn.addEventListener('click', () => toggleMessagePin(btn.dataset.pin).catch((e) => toast(e.message || 'Không ghim được tin.', 'error'))));
-  $('[data-forward]', list).forEach((btn) => btn.addEventListener('click', () => openForwardMessage(btn.dataset.forward)));
-  $('[data-reply-jump]', list).forEach((btn) => btn.addEventListener('click', () => jumpToSearchMessage(btn.dataset.replyJump)));
-  $('[data-receive-file]', list).forEach((btn) => btn.addEventListener('click', () => receiveFile(btn.dataset.receiveFile)));
-  $('[data-my-doc-open]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-heart]', list).forEach((btn) => btn.addEventListener('click', () => toggleHeart(btn.dataset.heart)));
+  $$('[data-reply]', list).forEach((btn) => btn.addEventListener('click', () => startReply(btn.dataset.reply)));
+  $$('[data-edit]', list).forEach((btn) => btn.addEventListener('click', () => editMessage(btn.dataset.edit).catch((e) => toast(e.message || 'Không sửa được tin.', 'error'))));
+  $$('[data-delete-message]', list).forEach((btn) => btn.addEventListener('click', () => deleteMessage(btn.dataset.deleteMessage).catch((e) => toast(e.message || 'Không xóa được tin.', 'error'))));
+  $$('[data-pin]', list).forEach((btn) => btn.addEventListener('click', () => toggleMessagePin(btn.dataset.pin).catch((e) => toast(e.message || 'Không ghim được tin.', 'error'))));
+  $$('[data-forward]', list).forEach((btn) => btn.addEventListener('click', () => openForwardMessage(btn.dataset.forward)));
+  $$('[data-reply-jump]', list).forEach((btn) => btn.addEventListener('click', () => jumpToSearchMessage(btn.dataset.replyJump)));
+  $$('[data-receive-file]', list).forEach((btn) => btn.addEventListener('click', () => receiveFile(btn.dataset.receiveFile)));
+  $$('[data-my-doc-open]', list).forEach((btn) => btn.addEventListener('click', () => {
     state.documentsManager.open(btn.dataset.myDocOpen).catch((e) => toast(e.message || 'Không mở được file.', 'error'));
   }));
-  $('[data-my-doc-download]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-my-doc-download]', list).forEach((btn) => btn.addEventListener('click', () => {
     state.documentsManager.download(btn.dataset.myDocDownload).catch((e) => toast(e.message || 'Không tải được file.', 'error'));
   }));
-  $('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-my-doc-remove]', list).forEach((btn) => btn.addEventListener('click', () => {
     removeMyDocumentMessage(btn.dataset.myDocRemove).catch((e) => toast(e.message || 'Không xóa được nội dung.', 'error'));
   }));
   requestAnimationFrame(updateScrollToLatestButton);
@@ -2498,7 +2498,7 @@ function renderPinnedMessages() {
       <span>📌</span><div><strong>${escapeHtml(text.slice(0, 180))}</strong><small>${message ? escapeHtml(formatTime(message.created_at)) : 'Cuộn lên để tải tin cũ'}</small></div>
     </button>`;
   }).join('') || '<div class="category-empty">Chưa có tin nhắn nào được ghim.</div>';
-  $('[data-pinned-jump]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-pinned-jump]', root).forEach((btn) => btn.addEventListener('click', () => {
     hide('#pinnedMessagesModal');
     jumpToMessageById(btn.dataset.pinnedJump).catch((e) => toast(e.message || 'Không mở được tin đã ghim.', 'error'));
   }));
@@ -2528,7 +2528,7 @@ function renderForwardConversationList() {
     <div class="avatar">${escapeHtml(initials(conversationLabel(conv)))}</div>
     <div><strong>${escapeHtml(conversationLabel(conv))}</strong><small>${conv.kind === 'group' ? 'Nhóm' : 'Trò chuyện riêng'}</small></div>
   </button>`).join('') || '<div class="category-empty">Không có cuộc trò chuyện phù hợp.</div>';
-  $('[data-forward-target]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-forward-target]', root).forEach((btn) => btn.addEventListener('click', () => {
     forwardMessageToConversation(state.forwardingMessageId, btn.dataset.forwardTarget).catch((e) => toast(e.message || 'Không chuyển tiếp được.', 'error'));
   }));
 }
