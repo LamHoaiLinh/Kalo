@@ -2923,7 +2923,7 @@ function renderMessageSearchResults(matches = null) {
       <small>${escapeHtml(new Date(m.created_at).toLocaleString('vi-VN'))}</small>
     </button>`;
   }).join('') || '<div class="message-search-empty">Không có tin nhắn phù hợp.</div>';
-  $('[data-search-message-id]', root).forEach((btn) => btn.addEventListener('click', () => {
+  $$('[data-search-message-id]', root).forEach((btn) => btn.addEventListener('click', () => {
     jumpToSearchMessage(btn.dataset.searchMessageId).catch((e) => toast(e.message || 'Không mở được kết quả tìm kiếm.', 'error'));
   }));
 }
