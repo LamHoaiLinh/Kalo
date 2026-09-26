@@ -15,6 +15,11 @@ import { KaloFileTransfer } from './webrtc.js';
 import { KaloDocuments } from './storage.js';
 import { KaloCallManager } from './call.js';
 import QrScanner from './vendor/qr-scanner.min.js';
+import { KaloPreferences, getDraft, setDraft, clearDraft, exportDrafts, importDrafts } from './preferences.js';
+import { KaloMessageService } from './message-service.js';
+import { uploadAvatar, removeAvatarObject, uploadEncryptedRelay, downloadEncryptedRelay, cleanupExpiredRelays, SMALL_FILE_RELAY_LIMIT } from './media-storage.js';
+import { downloadBackup, readBackupFile } from './backup.js';
+import { loadTurnConfig, saveTurnConfig } from './rtc-config.js';
 
 const REMEMBER_LOGIN_KEY = 'kalo-remember-login';
 const rememberLoginEnabled = () => localStorage.getItem(REMEMBER_LOGIN_KEY) !== '0';
@@ -90,6 +95,16 @@ const state = {
   avatarPendingDataUrl: '',
   avatarCrop: null,
   avatarViewerZoom: 1,
+  preferencesManager: null,
+  messageService: null,
+  conversationPrefs: {},
+  unreadCounts: new Map(),
+  currentReads: [],
+  messagePageHasMore: false,
+  loadingOlderMessages: false,
+  replyingToId: null,
+  messagePins: [],
+  forwardingMessageId: null,
   qrScanner: null,
 };
 
