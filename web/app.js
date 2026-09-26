@@ -2234,6 +2234,167 @@ function renderStickerGrid() {
   }));
 }
 
+function messageActionText(message) {
+  if (!message) return '';
+  const d = message.decoded || {};
+  if (message.deleted_at) return 'Tin nhắn đã xóa';
+  if (d.type === 'text' || d.type === 'locked') return String(d.text || '');
+  if (d.type === 'sticker') return String(d.sticker || 'Sticker');
+  if (d.type === 'image') return d.name ? `Ảnh: ${d.name}` : 'Ảnh';
+  if (d.type === 'file') return d.name ? `File: ${d.name}` : 'File';
+  return 'Tin nhắn';
+}
+
+function clearReply() {
+  state.replyingToId = null;
+  hide('#replyComposerBar');
+  $('#replyComposerText').textContent = '';
+}
+
+function startReply(messageId) {
+  const message = state.messages.find((m) => m.id === messageId);
+  if (!message || message.deleted_at) return;
+  state.replyingToId = messageId;
+  $('#replyComposerText').textContent = messageActionText(message).slice(0, 160);
+  show('#replyComposerBar');
+  $('#messageInput').focus();
+}
+
+function isMessagePinned(messageId) {
+  return state.messagePins.some((x) => x.message_id === messageId);
+}
+
+async function toggleMessagePin(messageId) {
+  const message = state.messages.find((m) => m.id === messageId);
+  if (!message || !state.preferencesManager || !state.currentConversationId) return;
+  if (isMessagePinned(messageId)) {
+    await state.preferencesManager.unpinMessage(messageId);
+    state.messagePins = state.messagePins.filter((x) => x.message_id !== messageId);
+    toast('Đã bỏ ghim tin nhắn.');
+  } else {
+    await state.preferencesManager.pinMessage(state.currentConversationId, messageId);
+    state.messagePins.unshift({
+      conversation_id: state.currentConversationId,
+      message_id: messageId,
+      created_at: new Date().toISOString(),
+    });
+    toast('Đã ghim tin nhắn.');
+  }
+  renderMessages();
+}
+
+async function editMessage(messageId) {
+  const message = state.messages.find((m) => m.id === messageId);
+  if (!message || message.sender_id !== state.user.id || message.deleted_at || message.decoded?.type !== 'text') return;
+  const next = window.prompt('Sửa tin nhắn', String(message.decoded.text || ''));
+  if (next === null) return;
+  const text = next.trim();
+  if (!text) return;
+  const profiles = memberProfiles(message.conversation_id);
+  const envelope = await encryptPayload({
+    ...message.decoded,
+    type: 'text',
+    text,
+    editedAt: Date.now(),
+  }, profiles);
+  const { error } = await supabase.from('kalo_messages')
+    .update({ encrypted_payloads: envelope, edited_at: new Date().toISOString() })
+    .eq('id', messageId)
+    .eq('sender_id', state.user.id);
+  if (error) throw error;
+  await loadMessages(message.conversation_id);
+  await refreshPreviews();
+  renderConversationList();
+  toast('Đã sửa tin nhắn.');
+}
+
+async function deleteMessage(messageId) {
+  const message = state.messages.find((m) => m.id === messageId);
+  if (!message || message.sender_id !== state.user.id || message.deleted_at) return;
+  if (!window.confirm('Xóa tin nhắn này?')) return;
+  const { error } = await supabase.from('kalo_messages')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', messageId)
+    .eq('sender_id', state.user.id);
+  if (error) throw error;
+  await loadMessages(message.conversation_id);
+  await refreshPreviews();
+  renderConversationList();
+}
+
+function renderPinnedMessages() {
+  const root = $('#pinnedMessagesList');
+  if (!root) return;
+  const pins = state.messagePins.filter((x) => x.conversation_id === state.currentConversationId);
+  root.innerHTML = pins.map((pin) => {
+    const message = state.messages.find((m) => m.id === pin.message_id);
+    const text = message ? messageActionText(message) : 'Tin cũ chưa được tải trong phiên hiện tại';
+    return `<button class="pinned-message-item" type="button" data-pinned-jump="${pin.message_id}">
+      <span>📌</span><div><strong>${escapeHtml(text.slice(0, 180))}</strong><small>${message ? escapeHtml(formatTime(message.created_at)) : 'Cuộn lên để tải tin cũ'}</small></div>
+    </button>`;
+  }).join('') || '<div class="category-empty">Chưa có tin nhắn nào được ghim.</div>';
+  $('[data-pinned-jump]', root).forEach((btn) => btn.addEventListener('click', () => {
+    hide('#pinnedMessagesModal');
+    jumpToSearchMessage(btn.dataset.pinnedJump);
+  }));
+}
+
+function openForwardMessage(messageId) {
+  const message = state.messages.find((m) => m.id === messageId);
+  if (!message || message.deleted_at) return;
+  if (!['text','sticker'].includes(message.decoded?.type)) {
+    toast('Hiện chuyển tiếp hỗ trợ tin chữ và sticker. File/ảnh có thể gửi lại trực tiếp.', 'error');
+    return;
+  }
+  state.forwardingMessageId = messageId;
+  $('#forwardConversationSearch').value = '';
+  renderForwardConversationList();
+  show('#forwardMessageModal');
+}
+
+function renderForwardConversationList() {
+  const root = $('#forwardConversationList');
+  if (!root) return;
+  const q = ($('#forwardConversationSearch')?.value || '').trim().toLowerCase();
+  const rows = state.conversations
+    .filter((conv) => conv.id !== state.currentConversationId)
+    .filter((conv) => !q || conversationLabel(conv).toLowerCase().includes(q));
+  root.innerHTML = rows.map((conv) => `<button class="forward-conversation-item" type="button" data-forward-target="${conv.id}">
+    <div class="avatar">${escapeHtml(initials(conversationLabel(conv)))}</div>
+    <div><strong>${escapeHtml(conversationLabel(conv))}</strong><small>${conv.kind === 'group' ? 'Nhóm' : 'Trò chuyện riêng'}</small></div>
+  </button>`).join('') || '<div class="category-empty">Không có cuộc trò chuyện phù hợp.</div>';
+  $('[data-forward-target]', root).forEach((btn) => btn.addEventListener('click', () => {
+    forwardMessageToConversation(state.forwardingMessageId, btn.dataset.forwardTarget).catch((e) => toast(e.message || 'Không chuyển tiếp được.', 'error'));
+  }));
+}
+
+async function forwardMessageToConversation(messageId, conversationId) {
+  const message = state.messages.find((m) => m.id === messageId);
+  if (!message) return;
+  const profiles = memberProfiles(conversationId);
+  if (!profiles.length) throw new Error('Cuộc trò chuyện đích chưa sẵn sàng.');
+  const payload = {
+    ...message.decoded,
+    forwarded: true,
+    forwardedAt: Date.now(),
+    originalSender: profileName(message.sender_id),
+  };
+  const envelope = await encryptPayload(payload, profiles);
+  const { error } = await supabase.from('kalo_messages').insert({
+    id: crypto.randomUUID(),
+    conversation_id: conversationId,
+    sender_id: state.user.id,
+    kind: 'text',
+    encrypted_payloads: envelope,
+  });
+  if (error) throw error;
+  hide('#forwardMessageModal');
+  state.forwardingMessageId = null;
+  toast('Đã chuyển tiếp tin nhắn.');
+  await refreshPreviews();
+  renderConversationList();
+}
+
 async function sendSticker(sticker) {
   if (!sticker) return;
   if (state.currentView === 'documents') {
@@ -2250,8 +2411,10 @@ async function sendSticker(sticker) {
     sender_id: state.user.id,
     kind: 'text',
     encrypted_payloads: envelope,
+    reply_to: state.replyingToId || null,
   });
   if (error) throw error;
+  clearReply();
   hide('#stickerPanel');
   await loadMessages(state.currentConversationId);
   await refreshPreviews();
@@ -2287,6 +2450,13 @@ async function sendTransferFile(file, type = 'file') {
 
   const transferId = crypto.randomUUID();
   const thumbnail = type === 'image' ? await makeImageThumbnail(file) : null;
+  let relay = null;
+  if (file.size <= SMALL_FILE_RELAY_LIMIT) {
+    relay = await uploadEncryptedRelay(supabase, state.currentConversationId, state.user.id, file).catch((error) => {
+      console.warn('Kalo encrypted relay upload failed; using P2P only', error);
+      return null;
+    });
+  }
   const envelope = await encryptPayload({
     type,
     transferId,
@@ -2294,6 +2464,7 @@ async function sendTransferFile(file, type = 'file') {
     size: file.size,
     mime: file.type || 'application/octet-stream',
     thumbnail,
+    relay,
     createdAt: Date.now(),
   }, profiles);
 
@@ -2304,12 +2475,16 @@ async function sendTransferFile(file, type = 'file') {
     sender_id: state.user.id,
     kind: 'file_offer',
     encrypted_payloads: envelope,
+    reply_to: state.replyingToId || null,
   });
   if (error) throw error;
+  clearReply();
 
-  toast(type === 'image'
-    ? 'Đã gửi ảnh xem trước. Hãy giữ Kalo mở để người nhận lấy ảnh gốc.'
-    : 'Đã gửi lời mời nhận file. Hãy giữ Kalo mở cho tới khi truyền xong.');
+  toast(relay
+    ? 'Đã gửi file kèm bản relay mã hóa tạm thời; người nhận có thể tải ngay cả khi bạn offline.'
+    : (type === 'image'
+      ? 'Đã gửi ảnh xem trước. Hãy giữ Kalo mở để người nhận lấy ảnh gốc.'
+      : 'Đã gửi lời mời nhận file. Hãy giữ Kalo mở cho tới khi truyền xong.'));
   await loadMessages(state.currentConversationId);
   await refreshPreviews();
   renderConversationList();
@@ -2343,10 +2518,13 @@ async function sendMessage() {
       sender_id: state.user.id,
       kind: 'text',
       encrypted_payloads: envelope,
+      reply_to: state.replyingToId || null,
     });
     if (error) throw error;
     input.value = '';
     input.style.height = '';
+    clearDraft(state.user.id, state.currentConversationId);
+    clearReply();
     await loadMessages(state.currentConversationId);
     await refreshPreviews();
     renderConversationList();
@@ -2377,8 +2555,31 @@ async function sendImage(file) {
 
 async function receiveFile(messageId) {
   const msg = state.messages.find((m) => m.id === messageId);
-  if (!msg?.decoded?.transferId) return;
+  if (!msg) return;
   try {
+    if (msg.decoded?.relay) {
+      const file = await downloadEncryptedRelay(supabase, msg.decoded.relay, {
+        name: msg.decoded.name,
+        mime: msg.decoded.mime,
+      });
+      if (state.documentsManager) {
+        const saved = await state.documentsManager.saveFile(file);
+        await appendMyDocumentItem({
+          id: crypto.randomUUID(),
+          type: msg.decoded.type === 'image' ? 'image' : 'file',
+          fileName: saved,
+          name: saved,
+          size: file.size,
+          mime: file.type,
+          thumbnail: msg.decoded.thumbnail || null,
+          created_at: new Date().toISOString(),
+        });
+        await refreshStorageUi();
+        toast('Đã tải file mã hóa và lưu vào My Documents.');
+        return;
+      }
+    }
+    if (!msg.decoded?.transferId) throw new Error('File không còn bản tải khả dụng.');
     await state.fileManager.requestReceive(
       msg.decoded.transferId,
       msg.sender_id,
