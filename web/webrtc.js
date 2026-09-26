@@ -1,4 +1,5 @@
-import { FILE_CHUNK_SIZE, MAX_LOCAL_BLOB_FALLBACK, RTC_CONFIG } from './config.js';
+import { FILE_CHUNK_SIZE, MAX_LOCAL_BLOB_FALLBACK } from './config.js';
+import { getRtcConfig } from './rtc-config.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -133,10 +134,32 @@ export class KaloFileTransfer {
     }
   }
 
+  scheduleConnectionGuard(session) {
+    clearTimeout(session.guardTimer);
+    session.guardTimer = setTimeout(async () => {
+      const state = session.pc?.connectionState;
+      if (!['new','connecting','disconnected'].includes(state)) return;
+      try {
+        if (session.role === 'sender') {
+          const offer = await session.pc.createOffer({ iceRestart: true });
+          await session.pc.setLocalDescription(offer);
+          await this.sendSignal(session.transferId, session.peerId, 'offer', {
+            description: session.pc.localDescription,
+            restart: true,
+          });
+          this.status({ type: 'connection', transferId: session.transferId, state: 'retrying' });
+        }
+      } catch (error) {
+        console.warn('Kalo file ICE restart failed', error);
+      }
+    }, 12000);
+  }
+
   createPeer(transferId, peerId, role) {
-    const pc = new RTCPeerConnection(RTC_CONFIG);
+    const pc = new RTCPeerConnection(getRtcConfig());
     const session = { pc, peerId, transferId, role, dc: null };
     this.sessions.set(keyOf(transferId, peerId), session);
+    this.scheduleConnectionGuard(session);
 
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
@@ -145,6 +168,8 @@ export class KaloFileTransfer {
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       this.status({ type: 'connection', transferId, state });
+      if (state === 'connected') clearTimeout(session.guardTimer);
+      if (state === 'disconnected') this.scheduleConnectionGuard(session);
       if (state === 'failed') {
         this.status({
           type: 'error',
