@@ -1539,60 +1539,80 @@ async function refreshPreviews() {
   }
 }
 
+async function refreshUnreadCounts() {
+  if (!state.messageService) return;
+  try {
+    state.unreadCounts = await state.messageService.unreadCounts();
+  } catch (error) {
+    console.warn('Kalo unread count refresh failed', error);
+  }
+}
+
 async function markRead(conversationId) {
   const last = state.messages[state.messages.length - 1];
-  if (!last) return;
-  await supabase.from('kalo_reads').upsert({
-    conversation_id: conversationId,
-    user_id: state.user.id,
-    last_message_id: last.id,
-    read_at: new Date().toISOString(),
-  });
+  if (!last || !state.messageService) return;
+  await state.messageService.markRead(conversationId, last.id);
+  state.unreadCounts.set(conversationId, 0);
+  renderConversationList();
 }
 
 async function loadMessages(conversationId) {
   if (!state.identity) return;
-  const { data, error } = await supabase
-    .from('kalo_messages')
-    .select('*')
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
-    .limit(150);
-  if (error) {
+  if (!state.messageService) {
+    state.messageService = new KaloMessageService(supabase, state.user.id, state.identity, 100);
+  }
+  try {
+    const result = await state.messageService.latest(conversationId, 100);
+    state.messages = result.messages;
+    state.messagePageHasMore = result.hasMore;
+    state.currentReads = await state.messageService.reads(conversationId).catch(() => []);
+    await loadReactions();
+    renderMessages();
+    await markRead(conversationId);
+    await refreshUnreadCounts();
+    setTimeout(() => scrollMessagesToLatest({ smooth: false }), 0);
+  } catch (error) {
+    console.error(error);
     toast('Không tải được tin nhắn.', 'error');
-    return;
   }
+}
 
-  const decoded = [];
-  for (const row of data || []) {
-    let payload;
-    try {
-      payload = await decryptPayload(row.encrypted_payloads, state.user.id, state.identity);
-    } catch {
-      payload = { type: 'locked', text: 'Không mở được tin nhắn này trên thiết bị hiện tại.' };
-    }
-    decoded.push({ ...row, decoded: payload });
+async function loadOlderMessages() {
+  if (state.loadingOlderMessages || !state.messagePageHasMore || !state.currentConversationId || !state.messageService) return;
+  const first = state.messages[0];
+  if (!first?.created_at) return;
+  const list = $('#messageList');
+  const previousHeight = list?.scrollHeight || 0;
+  const previousTop = list?.scrollTop || 0;
+  state.loadingOlderMessages = true;
+  try {
+    const result = await state.messageService.before(state.currentConversationId, first.created_at, 100);
+    const existing = new Set(state.messages.map((m) => m.id));
+    const older = result.messages.filter((m) => !existing.has(m.id));
+    state.messages = [...older, ...state.messages];
+    state.messagePageHasMore = result.hasMore;
+    await loadReactions();
+    renderMessages();
+    requestAnimationFrame(() => {
+      if (!list) return;
+      list.scrollTop = previousTop + Math.max(0, list.scrollHeight - previousHeight);
+    });
+  } catch (error) {
+    console.warn('Kalo load older messages failed', error);
+  } finally {
+    state.loadingOlderMessages = false;
   }
-  state.messages = decoded;
-  await loadReactions();
-  renderMessages();
-  await markRead(conversationId);
-  setTimeout(() => scrollMessagesToLatest({ smooth: false }), 0);
 }
 
 async function loadReactions() {
   const ids = state.messages.map((m) => m.id);
   state.reactions.clear();
-  if (!ids.length) {
-    renderMessages();
-    return;
-  }
+  if (!ids.length) return;
   const { data } = await supabase.from('kalo_reactions').select('*').in('message_id', ids);
   for (const r of data || []) {
     if (!state.reactions.has(r.message_id)) state.reactions.set(r.message_id, []);
     state.reactions.get(r.message_id).push(r);
   }
-  renderMessages();
 }
 
 function renderOnlineSummary() {
