@@ -804,7 +804,7 @@ function createConversationCategory(name, color) {
   const item = { id: crypto.randomUUID(), name: cleanName, color: safeCategoryColor(color) };
   state.conversationCategories.push(item);
   saveConversationCategories();
-  state.preferencesManager?.deleteCategory(categoryId).catch(() => {});
+  state.preferencesManager?.saveCategory(item, state.conversationCategories.length - 1).catch(() => {});
   renderCategoryManager();
   renderCategoryFilterMenu();
   renderConversationList();
@@ -818,6 +818,7 @@ function deleteConversationCategory(categoryId) {
   }
   if (state.activeCategoryFilter === categoryId) state.activeCategoryFilter = 'all';
   saveConversationCategories();
+  state.preferencesManager?.deleteCategory(categoryId).catch(() => {});
   renderCategoryManager();
   renderCategoryFilterMenu();
   renderConversationList();
