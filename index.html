@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#73c39a" />
+  <meta name="description" content="Kalo - trò chuyện riêng tư cho gia đình và nhóm nhỏ." />
+  <title>Kalo</title>
+  <link rel="icon" href="./icon.svg" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./styles.css?v=1.7.0" />
+</head>
+<body>
+  <main id="authScreen" class="auth-screen">
+    <section class="auth-card">
+      <div class="brand-large">
+        <img src="./icon.svg" alt="" />
+        <div>
+          <h1>Kalo</h1>
+          <p>Trò chuyện riêng tư cho gia đình và nhóm nhỏ</p>
+        </div>
+      </div>
+
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" data-auth-tab="login" type="button">Đăng nhập</button>
+        <button class="auth-tab" data-auth-tab="register" type="button">Tạo tài khoản</button>
+        <button class="auth-tab" data-auth-tab="forgot" type="button">Quên mật khẩu</button>
+      </div>
+
+      <form id="loginForm" class="auth-form" data-auth-panel="login">
+        <label>ID hoặc email<input id="loginId" autocomplete="username" required /></label>
+        <label>Mật khẩu<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+        <label class="remember-row">
+          <input id="rememberLogin" type="checkbox" checked />
+          <span>
+            <strong>Lưu trạng thái đăng nhập</strong>
+            <small>Lần sau bấm Alt + K sẽ vào Kalo luôn trên thiết bị này.</small>
+          </span>
+        </label>
+        <button class="primary-btn" type="submit">Đăng nhập</button>
+        <p class="form-note">Bạn có thể đăng nhập bằng ID Kalo. Email chỉ cần khi bạn đã đăng ký email khôi phục.</p>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden" data-auth-panel="register">
+        <label>Tên hiển thị<input id="registerName" maxlength="80" placeholder="Ví dụ: Linh" required /></label>
+        <label>ID Kalo<input id="registerId" maxlength="32" autocomplete="username" placeholder="linh" required /></label>
+        <div class="two-col">
+          <label>Mật khẩu<input id="registerPassword" type="password" minlength="8" autocomplete="new-password" required /></label>
+          <label>Nhập lại mật khẩu<input id="registerPassword2" type="password" minlength="8" autocomplete="new-password" required /></label>
+        </div>
+        <label>Email khôi phục <span class="optional">(không bắt buộc)</span>
+          <input id="registerEmail" type="email" autocomplete="email" placeholder="ban@gmail.com" />
+        </label>
+        <button class="primary-btn" type="submit">Tạo tài khoản</button>
+        <p class="form-note">Không nhập email vẫn dùng Kalo bình thường. Bạn sẽ nhận một mã khôi phục để tự giữ.</p>
+      </form>
+
+      <section id="forgotPanel" class="auth-form hidden" data-auth-panel="forgot">
+        <form id="codeResetForm" class="stack">
+          <h3>Tạo mật khẩu mới bằng mã khôi phục</h3>
+          <label>ID hoặc email<input id="resetId" required /></label>
+          <label>Mã khôi phục<input id="resetCode" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" required /></label>
+          <label>Mật khẩu mới<input id="resetPassword" type="password" minlength="8" required /></label>
+          <button class="primary-btn" type="submit">Tạo mật khẩu mới</button>
+        </form>
+        <div class="or"><span>hoặc</span></div>
+        <form id="emailResetForm" class="stack">
+          <h3>Khôi phục bằng email</h3>
+          <label>ID hoặc email<input id="emailResetId" required /></label>
+          <button class="secondary-btn" type="submit">Gửi email khôi phục</button>
+          <p class="form-note">Kalo chỉ gửi email khi bạn chủ động yêu cầu. Mỗi tài khoản được giới hạn một yêu cầu trong 10 phút.</p>
+        </form>
+      </section>
+
+      <div id="authMessage" class="auth-message" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <main id="appScreen" class="app-shell hidden">
+    <div class="app-quick-actions" aria-label="Thao tác nhanh Kalo">
+      <button id="returnKanbanBtn" class="app-quick-action" type="button" title="Trở về KanBan" aria-label="Trở về KanBan">
+        <img src="data:image/png;base64,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" alt="" />
+      </button>
+      <button id="quickLogoutBtn" class="app-quick-action logout" type="button" title="Đăng xuất Kalo" aria-label="Đăng xuất Kalo">
+        <img src="data:image/png;base64,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" alt="" />
+      </button>
+    </div>
+    <aside class="rail">
+      <button id="selfAvatarBtn" class="rail-logo" type="button" title="Tài khoản của tôi">
+        <span id="selfAvatar" class="rail-self-avatar"><img src="./icon.svg" alt="Kalo" /></span>
+      </button>
+      <div class="rail-main">
+        <button class="rail-btn active" data-view="chats" type="button" title="Tin nhắn">💬<span>Tin</span></button>
+        <button class="rail-btn" data-view="people" type="button" title="Danh bạ">👥<span>Bạn</span></button>
+        <button class="rail-btn" data-view="documents" type="button" title="My Documents">🗂<span>Tài liệu</span></button>
+      </div>
+      <div class="rail-bottom">
+        <button id="privacyBtn" class="rail-btn" type="button" title="Che tin nhắn (Alt+.)" aria-pressed="false">🙈<span>Che</span></button>
+        <button id="settingsBtn" class="rail-btn" type="button" title="Cài đặt">⚙<span>Cài đặt</span></button>
+      </div>
+    </aside>
+
+    <section class="conversation-pane">
+      <header class="pane-header">
+        <div>
+          <h2 id="leftPaneTitle">Tin nhắn</h2>
+          <small id="onlineSummary">Đang kết nối...</small>
+        </div>
+        <div class="pane-actions">
+          <button id="addFriendBtn" class="header-action hidden" type="button" title="Thêm bạn"><span>＋</span><b>Thêm bạn</b></button>
+          <button id="createGroupBtn" class="header-action" type="button" title="Tạo nhóm"><span>👥</span><b>Tạo nhóm</b></button>
+        </div>
+      </header>
+      <div class="conversation-toolbar">
+        <div class="search-wrap"><input id="conversationSearch" placeholder="Tìm cuộc trò chuyện..." /></div>
+        <div id="categoryFilterWrap" class="category-filter-wrap">
+          <button id="categoryFilterBtn" class="category-filter-btn" type="button" title="Lọc theo phân loại">
+            <span id="categoryFilterDot" class="category-filter-dot"></span>
+            <span id="categoryFilterLabel">Phân loại</span>
+            <span class="category-filter-caret">⌄</span>
+          </button>
+          <div id="categoryFilterMenu" class="category-filter-menu hidden"></div>
+        </div>
+      </div>
+      <div id="conversationCategoryMenu" class="conversation-category-menu hidden"></div>
+      <div id="conversationList" class="conversation-list"></div>
+      <div id="peopleList" class="conversation-list hidden"></div>
+      <div id="documentsList" class="conversation-list hidden"></div>
+    </section>
+
+    <section class="chat-pane">
+      <div id="emptyChat" class="empty-chat">
+        <img src="./icon.svg" alt="" />
+        <h2>Kalo</h2>
+        <p>Chọn một cuộc trò chuyện hoặc tạo cuộc trò chuyện mới.</p>
+      </div>
+
+      <section id="documentsHome" class="documents-home hidden">
+        <div class="documents-hero">
+          <div class="documents-icon">🗂</div>
+          <div>
+            <h2>My Documents</h2>
+            <p>Ảnh và file lưu trực tiếp trên thiết bị của bạn.</p>
+          </div>
+          <button id="addDocumentBtn" class="primary-btn" type="button">＋ Thêm file</button>
+          <input id="documentInput" type="file" multiple hidden />
+        </div>
+        <div class="documents-storage-card">
+          <div>
+            <small>Vị trí lưu trữ</small>
+            <strong id="documentsStorageLabel">Đang kiểm tra...</strong>
+          </div>
+          <button id="documentsChangeFolderBtn" class="secondary-btn" type="button">Thay đổi</button>
+        </div>
+        <div id="documentsDetail" class="documents-detail">
+          <div class="documents-placeholder">Chọn một file ở bên trái để xem thao tác.</div>
+        </div>
+      </section>
+
+      <div id="activeChat" class="active-chat hidden">
+        <header class="chat-header">
+          <div class="avatar" id="chatAvatar">K</div>
+          <div class="chat-title">
+            <div class="chat-title-line">
+              <strong id="chatTitle">Kalo</strong>
+              <button id="renameContactBtn" class="rename-contact-btn hidden" type="button" title="Đặt biệt danh" aria-label="Đặt biệt danh">✎</button>
+            </div>
+            <small id="chatSubtitle">Riêng tư</small>
+          </div>
+          <div class="chat-actions">
+            <button id="messageSearchBtn" class="icon-btn" type="button" title="Tìm trong cuộc trò chuyện" aria-label="Tìm trong cuộc trò chuyện">🔍</button>
+            <button id="audioCallBtn" class="icon-btn" type="button" title="Gọi thoại">📞</button>
+            <button id="videoCallBtn" class="icon-btn" type="button" title="Gọi video">🎥</button>
+            <button id="pinnedMessagesBtn" class="icon-btn" type="button" title="Tin đã ghim">📌</button>
+            <button id="chatInfoBtn" class="icon-btn" type="button" title="Thông tin">ⓘ</button>
+          </div>
+        </header>
+
+        <section id="messageSearchPanel" class="message-search-panel hidden" aria-label="Tìm tin nhắn">
+          <div class="message-search-controls">
+            <label class="message-search-text">
+              <span>🔍</span>
+              <input id="messageSearchText" type="search" placeholder="Tìm chữ, tên file..." autocomplete="off" />
+            </label>
+            <label class="message-search-date">
+              <span>Ngày</span>
+              <input id="messageSearchDate" type="date" />
+            </label>
+            <button id="messageSearchClear" class="secondary-btn compact-btn" type="button">Xóa lọc</button>
+            <button id="messageSearchClose" class="icon-btn" type="button" title="Đóng tìm kiếm">×</button>
+          </div>
+          <div id="messageSearchSummary" class="message-search-summary">Nhập từ khóa hoặc chọn ngày.</div>
+          <div id="messageSearchResults" class="message-search-results"></div>
+        </section>
+
+        <div id="messageList" class="message-list"></div>
+        <button id="scrollToLatestBtn" class="scroll-to-latest-btn hidden" type="button" title="Về tin nhắn mới nhất" aria-label="Về tin nhắn mới nhất">
+          <span>⌄</span>
+        </button>
+
+        <div id="fileProgress" class="file-progress hidden">
+          <div><strong id="fileProgressText">Đang truyền file...</strong><span id="fileProgressPct">0%</span></div>
+          <progress id="fileProgressBar" max="100" value="0"></progress>
+        </div>
+
+        <div id="stickerPanel" class="sticker-panel hidden">
+          <div class="sticker-panel-head"><strong>Sticker</strong><button id="closeStickerBtn" type="button">×</button></div>
+          <div id="stickerGrid" class="sticker-grid"></div>
+        </div>
+
+        <div id="replyComposerBar" class="reply-composer-bar hidden">
+          <div>
+            <strong>Đang trả lời</strong>
+            <span id="replyComposerText"></span>
+          </div>
+          <button id="cancelReplyBtn" type="button" aria-label="Hủy trả lời">×</button>
+        </div>
+        <footer class="composer">
+          <input id="imageInput" type="file" accept="image/*" hidden />
+          <input id="fileInput" type="file" hidden />
+          <div class="compose-tools">
+            <button id="stickerBtn" class="compose-icon compose-image-btn" type="button" title="Gửi sticker" aria-label="Gửi sticker"><img class="compose-tool-image" src="data:image/png;base64,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" alt="" /></button>
+            <button id="imageBtn" class="compose-icon compose-image-btn" type="button" title="Gửi ảnh" aria-label="Gửi ảnh"><img class="compose-tool-image" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAU9UlEQVR42u2aeZBdVb3vP7+19j5TD2k63Rk66cxgAG/gvsADZOgECXiDUpYalPsQlICCYRCU6FWvSZxFUcQqLzJD7qUkefIACyIBYoJCwAA3iglkIkln7Aw99xn3Wr/3xz7ndIdbdQMmvrLqZVV19zmn19l7rd/w/X1/37Xh2Dg2jo1j49g4No6N/1+HHG7CggULzKJFi7yqhl/6xsJb29t3fbpYKk2NIo8JDIKAxJcRBUVBQeM3CKAMfS/o0Ltq5esCqofcWyvfl/ivVKaUX2h5vnpPIgxJJcM3p0wYt/jbC77+YxEpVdZ+RAYA5LHHHmt84pkVv+442N0mqgSB3Qv0IYKYshHKVxONFxyvTdGhN/KAGbxrdb8exFQ2VrXLkMVpbLjqu/Ir7xFEjAhefSoIwrHWBtTVpladderJH7vmmms6D7e54HATVNV85tobf9Xdm2urr0mvnjRp4s0/WPC1V/4ew/k7t//szM2btvywdyDX9odX1z6hqheKSO6IIuDG+f8yd8eeA/fWZFKvLr7rzjbAPZMr3Ly+MztBwAJEqrmC832R+shgDKKRB0IjyRCTyrqoz6tExmDUo0YksCqhGFVBJFItetUIPIpRATEiicBI0gAeb6yKIOK94EQJnGqxpL4kqs6oiaYPr+ma3VDzb6qauvLz857vHch94PiJ47/8o+8svP2IIuDAga4brREmjm+9ESj8pP3A609nmqbtKSWwJrafkTiEKxFcyXu0nMe2ChOIAV8FhjhlAtHBFPAQledoGVeGequSNmIGs0kUVufg9m37PwecNWbkyPmdGzb/YVv7js8AR2aAYima5rzf+61/ufXl5d19Vz2XaJr2xp7+Qp0YSyXfUQSNNyvlXJUhAFgJNT00tw2K8UrBJCiKQVQpEZCkSIoSKqZqAEWqIFsBwwr6iHh2e5yObDp1clf/3O9965v/9pFPfrqzWCidfMQYkC8UCIOgR0T09u0drV22zteLWANBZYcaLwOVoWA15PeQjWsZ9S0CBpwEnJJby/SBlQyLOmlPjGd17Sz2JieQpIDHVCMlxqTYEJUPBEFUqLHK7gJ+U6F4ojSKv/jSy/d71cajAYJ41TjXkWK8bLwIeD+I+ph4Ob6yVY0NUvG3qFbDQkRRiUvCld138bl9P6A+2wEG1EN7/TR+OPJ7rKydRahFVAdL7X+FL8WL4GI7mzCUJIA11qKHB05z+CIo+HLBVe+lEo7Vmm40vopWfF5JgeoHsT2MoCbevMVTlDTn9z3Nl/Z+g2HBfjixCTttBExuZGrxzyzo+CIT8+vISxLEo6KxoUXKaTfknjpIFpwSxTtTNcYcuQGMDNraiwkiHQzvKtNB4wVWw8bjRfDG4NXHdVtifBDAYwldlksOLCZwA8iUZtIjAhK1hkxrhuz4Jsb0bWZW1+NEJkbQwQ1rFWPUcEiyxSmmUTU15ChEgGCQsiWtJRPpILOreGLQ0YoXkHSGEE+ilMMmkxBYUI+giCglMdS6Tkbnt6I1hiADWlLwFoqORH2As8L43EYSPo9iEBV82dHvcEEZimJssLEdKonHEWOACJiyKVWNDmVqKqBV73i8MaQEUr97Evvy75HsAHrCVKLZH2dg+Cg0n0dFQB0lk6BkE4gr+0FAvSJWUC8YFDWmvMH491CParnqGJEyPY6jLK9aeC809/BJooMG8KqlmOYOwrogMQQYS01gqf31/STv+zmNXW/Sku6g9oXfUnv3T6jbvxuSKdQ5LJ5u08j6+jNI5D2FfRHYADGC14DS3hwh8Eb92USSiqlQNdYUX4k+qWShVkNRnXfvhem/qwioXMeri0SGekAQiT1fG1pqH3sYt+w3tJzVxBlXtVLTYNm8coC1i7eQuvsnlObeSH/zWGwhiw1SPDr8Gs7Lv8CkbX8h15lGUyHSlyczUOS5xktY1vAJUhRRDz6wcSpFEeIijNhyRMTrGGwsTByQYv5Lc/VXRcAhl1ATmUreq4B6HIa0tdT8n4fh6ScZd04zM2+cTCFVZFfvACfNbmTa5WPQLevJ/PJ2avfthHQtSZ/lreRJ3NxyH88M+yj7uofRuStgZ76FB5uv4xuj7qDXNmDFY9Jp0v1d1OzeSqqYxaYzVTDUaomNHVVAc7yDQR4hDxi0gsFjyyVZ1BMZS8pAesk9+GeeYtyZjcyaN5Fd+X5Wb+mhBHT0FTj1wkaKpVbWPriJ2vvuIHHtl+lraiHM51ibPJXrRz3AuOGbyPheDgaj2JWYhBEhpETaWsJnlmBXLIfefhg9Cn/xx8ie3kY+m4/bYqTMDEG9lg5Z+9EwgPPlltoYTBkU1VjSApkld+OfepLRZw7n/HkT2FsY4KVtXbjAECBs2p+nUOrgjItHEJgEf3pkG+beO+HqG+ltHE2YH8DZkI3BqagxWI0IowLOWBLWkHnsAVj2JE1T0jSeVsu+P++k94FfYPI5orM/RJTNVvPdArbcm6t37wrigveSAt7H77011AWG1JJ7cU/9hpazGplxw3jac9281t6HWotF8d6TCAN29ESEWzs568MthEHIqw9tIPzlT0hfdRP9zWOQYp60LSBlkSOyAUmU1JJ7cMufZsrMkZx55WgS9Z6+XS2s+vlWDj58D7WlEn1ts9FcAVNuxswQx+nRqAKHTnCpvEImtNQ89jA8s4zWs5s4/4YJ7Cn28/KWTiIEvMbGUlCjJJIJtvdErN68lxMubODUy8fA5vWk7voRNR07IZUuU25BTUhtAHVL74Gnn2T8OQ2ce3UL3S7P2rd7kUZP2/XjqBulBP9+D3WrniJRk8GL4gQixVco/FEBQREQiaeFyVRDgCfzq3vxTz/B2DMa+KebTqDLFXltax/YMM5DVcDH3y1LVtYYtnUXeGnzLiZfVM8/Xjke2/42tQ/eybDODjRM4FAy4qhZch9mxXImzmhi5udbebunixfe7uLNngIrNnSQHVZgxi2TaRibILVkMfUvLiOdyRA5pTa0zYNrl6PRC1Dt+1OR669b+hDR4/+bMafV8aHrJ7O3NMAft/dAEA6SEiosaSh1UwJjaO8q8eqWA0y9uJHpV00ksWMr6ft+RqpzH8kgIPnI3eizv2VSWzMXzpvCjmyWNe19OGNIGCHrDC9u6CJq9Fw4/300tobYRx6kZtVTkBQCS1N1c+Yo8IAyt1eA12//4Sv+zS2MPrNOzpvXSnuhm1e2duPEYGMt4x2CXrVfRk2cGmEYsKPbEW7v5oyLRxGIZc2D66h58GeYpiaiFSuY8MFmLrh2PNt6e/njjj5MmMAAznmsCAUNeHlzNzPeN4JZN0/h2Z9uYt9D91CbShJccG4BwAYGgzk6PKDi1ddXrO5rnpZi1s3Hs7vQzx82HqDkyw2ODmFeVfakh0o5ZRaZCAO2d5dY8/Z+/uGSJqZfMZlwy0Z01UrGnXcc510zli09Xaxu70JNgCnznEptT1jIq7Bq4z6y9QXabhhP/WhIPrqY4orf7gQIjHlXXPiwBvDe4XEC8IXbLp1y8S0nst8XdM3mXoRE7Pl3ytlDSEpZtBrSNcXtbGAsW3tz/Km9l/59JYrOMPbcYcy4rpWtvT28tKUTh4l7gqqOLtXGx4qQU2HVWx1k6wvM/PIkaps9e9b8aX81BY9GFVAPWmbXp599wsjeEF7Z0h3nvC17/hAtoCyGVP5qGRSl8uPj/j6ISCWSrFuyn3W/3cfxbfVcOG8SOwcGWLO1D7EBRhXvhzAxkeqPlhefd4YX3+oi3+CYcdNExn1gVF1lrvN6FDBApKrDb+zoLb3YfZCCsSSRGBoqPaooahwYXzFD2RBBnIsqILacDYIteEqrBsivyXPCB+uZOXcc2/r6eG1HFgnjauL9EKFVYzEFBFVfzU0rloI3vLyxh9nTR3DKqJYAwGnE0Lbor2+GhqgqHf05U4g8gYI3IEYQUYQiqhZfqsFFDWjUiBaH4QoZXDGFugSqIeJD8IIEIcm9z5H7/ctMOb+Zcz47mq29PbzS3oO3FquK+qFdniKhQQJwBR8ngoJo7JwgMOTUsmZHD6PqiwrgIsUfDSpsRRArg0c4zsdxL7EoYoKAYs/xFDomUegdQVRqwEgasQnUGLwBDQSsiaVvYxCbY/jJnmlTWzjhA81s6e7h1R39qAmwomhV5ShLrFbQ/Q4tGcIJIaVcCfHlIzZjwCgBwkCk7OsvHHKadBRS4FAwVT9ECbOW7J42cjtPpyghvl7guBBfl0QyFk1ZYv3Y4I0pa3shiWgLxZ599NSnWL2zm47eAhiL1UG8qRw5qoK1loGXskQbPKlzUiRPT+ADh7o4ChXBqwPv8WVJkPh05SikAHKIsCCmfMSnipYMucIE3EljkVEenw5Qa+IzAj+o01EGQlWPmoCa7AZ8boD2XAIBbGBjDVXfcSoosShpBCwW9Z6B5zopbk9TN7semixRXjFGMB585AhskIpJkMHEB1dHWAWG9MMJk4g9KuUcLeVIj12JTOggqs8gJo24AI0MRArOo97HG8eArSVT3Eam7/cYMSQCIQzeKV5K9b5argBqYuBzyRqCf5xBYbOj91c9+HYIM0Gcki4GypL3xTg4gyqFP6IIcM5pGQhF4uPg2K9eUbEkixsI2n9EseZkosxUokQrztQTSQpvwljQxBO4XpL5TdR0/4bQ70NNiLpYJFUk5u1a4Q/x6U+594akieUykyBx/mdJTJqOe3YxfY8cJD1zGKlTLCWJEFV8VHIVM5a8c0cOgsaI+jjzQ0lEOK9GRUUtiEckidUCiYFX8Pk1eEnhbT1e6lBJ4dUiGhG4LqzvQIwHm4hVHJVqqmgIkjQERsAJfsBDH2jOo8YjeYsJLT6KsNPOJ9E4hvyye+l7ch2lHXXUzEwTNllCDRMV6aI2k7FHbIBEIpF3Lmr53ZLf1R7XOuaZNevf+P6u4u4wGaR8HLwOVUHVongVySJuQER2YryLgc2DQ9SZAMWKmCIGxHslNCFhGEIe/B4o7CwQ7S5R6sjheoqQjwBLECRwDXVYExAN5NDmyQQfn497/n6yr62icLBgWi4dVbzoo+c8BsiEsaOuaGgYfvwRGyCTSa7qy8pFy95YedVtly6689H1T38nI8n5B/q7E2EiiMuhi3mZDaz4MhGW6pmJ4rxHjIgx8dGZAVwURTYRuI49Xcmu/+yhuKEfd9CD1ED9cEzjCGzLcfiaYfh0PVGYImhoRlMZ8Ior5HCJOoLZN6DN4zVa/Tg7Ht7lf/7HR9qAP9/23e++BLx0xI/IfH3Bt895Y8OWF0pRdPDkKRMv+fEPvr1a40PHpl4KCkiBAmBrwNcbtGAwA5awAAW6+gaC7t7+ZCJBvbFhur8/OzB93Ekdy1544fTnX1iz8JVXX5/c3dGHjBwv9vhTCCZNw45oxdQ0oDbEYfC+zA3UI1ExXniZKHmERDqD2bqG3LMP0OAHaB3TsuSGz8yZd9pppx04YgMAfG7eTd/a0dH5r1FUKp5w/IQHtFh6ZPf2/buSSSiVrAKUSv3a3z/gvQ8lUZ+QFEmaxjbJ1Anv3/+Vr1zdN/R6l33+1pu2b2v/ene20BxOPlWT088XN+ZENN1Q1twipNxcV6JIVcvHf1ItzqYMnqqeMJ0h6Gyn7+lfRomOTcGI4Y3rZpxz+mduufbqV4/IAHPmzLFLly51194yf9HOXXu/FoTJIAxsXKLk0KedBHBe8RrrYcYahtWku+7/xc/GL1y4MLdw4UI75+qbH+jYu/+ygxqSmfEpTb7/HCkFKVypCN6Vy9/g8wTitaoqRc5Xl2yIhRox5ecGvAMbEPiI4vN3R7rp5WBk83CWPXq/HHEEVIjp4sWL3/f6Gxs+1tXXM72vL2sM4NXL0HNExeOcoqgXEWlqHL7p2s9e9o3p06eby66bv3zTlp3nFUdPiZIXXGFlxESRqIA4hytGFPpLFAey+EIRdYr6WOm0ZVzxziHq48bKxA9oGTN4KBIECYLedjXrHtd0rsO0tjS/9ug9d552NAwAc+ZYli51/JXjw5df90jH/t7LCpP+R6n+w3PDos1Q6u6j1Jcl6i/i81FsOPUY78HGp8JipCqwCK6sHMdGEGtiwDWWwBjC3WucbHjWDk9B69gR37v/ju9/U0Tc0TFA+ZnBlStXmlUjRuicd/cVu3Tp0uKVN37lqxve2vr9vhEnlJr+eX5YcIb+3QcpHBxASw6SSUwQIhKXbXFFlaiIaClWgYIQbChqLFHkUO8QLRsjSBBE/dgNy6Nw7+vBqKbj+k+cOmXu7d+8dcmhstRRMMB7NdaiRYv0jnse/IdfP/HMa/uLhvorF9qSHS65HQcgsogVJOpXzXZ6zfUouR4h3ytSGjA+24uWsoh6xIYEiSTSMAY3eSaR2hgobUjYu13NX57w6fxeO3r0yLXnnnXmFV/6/OVvtLW1BStXror+Xh3bL5E3t2R+5YtvUtk/q2R+dW/zkdV/78XOrV48cWiHmzFliVd+dfv2/rp2/8ZQLPqXnfuTT/rM3fe27g9V5ieXvbMRPr6qaWXPmvnThZV/Yt+inv7io8s+2trZgwYIF5r3gCcCV13916T/98xe6v/q9n36yEjXv5TrHxrFxbBwbx8axcWwcG+8c/xfJC01LEz4dAgAAAABJRU5ErkJggg==" alt="" /></button>
+            <button id="fileBtn" class="compose-icon compose-image-btn" type="button" title="Gửi file" aria-label="Gửi file"><img class="compose-tool-image" src="data:image/png;base64,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" alt="" /></button>
+          </div>
+          <textarea id="messageInput" rows="1" placeholder="Nhập tin nhắn..."></textarea>
+          <button id="sendBtn" class="send-btn" type="button">Gửi</button>
+        </footer>
+      </div>
+    </section>
+  </main>
+
+  <div id="addFriendModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card friend-modal">
+      <header>
+        <div><h3>Thêm bạn</h3><p>Quét QR hoặc nhập ID Kalo. Lời mời cần được người kia đồng ý.</p></div>
+        <button data-close-modal="addFriendModal" type="button" aria-label="Đóng">×</button>
+      </header>
+
+      <div class="friend-tabs">
+        <button class="friend-tab active" data-friend-tab="scan" type="button">Quét QR</button>
+        <button class="friend-tab" data-friend-tab="id" type="button">Nhập ID</button>
+        <button class="friend-tab" data-friend-tab="mine" type="button">QR của tôi</button>
+      </div>
+
+      <section data-friend-panel="scan" class="friend-panel">
+        <div class="qr-camera-wrap">
+          <video id="qrVideo" playsinline muted></video>
+          <div class="qr-scan-frame"></div>
+          <div id="qrCameraHint" class="qr-camera-hint">Bấm “Mở camera” rồi đưa mã QR vào giữa khung.</div>
+        </div>
+        <div class="qr-actions">
+          <button id="startQrBtn" class="primary-btn" type="button">📷 Mở camera</button>
+          <label class="secondary-btn qr-upload-btn">🖼 Chọn ảnh QR<input id="qrImageInput" type="file" accept="image/*" hidden /></label>
+        </div>
+        <p class="form-note">Trên điện thoại, Kalo ưu tiên camera sau. Bạn cũng có thể chọn ảnh QR từ thư viện.</p>
+      </section>
+
+      <section data-friend-panel="id" class="friend-panel hidden">
+        <form id="addFriendIdForm" class="stack">
+          <label>ID Kalo<input id="friendIdInput" maxlength="32" placeholder="Ví dụ: lamhoailinh" autocomplete="off" /></label>
+          <button class="primary-btn" type="submit">Gửi lời mời kết bạn</button>
+        </form>
+      </section>
+
+      <section data-friend-panel="mine" class="friend-panel hidden">
+        <div class="my-qr-card">
+          <div id="myQrCode" class="my-qr-code" aria-label="Mã QR Kalo của tôi"></div>
+          <strong id="myQrName">Kalo</strong>
+          <span id="myQrId">@id</span>
+          <p>Người khác quét mã này để gửi lời mời kết bạn.</p>
+        </div>
+        <button id="shareQrBtn" class="secondary-btn full-btn" type="button">Chia sẻ liên kết kết bạn</button>
+      </section>
+    </section>
+  </div>
+
+  <div id="groupModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card modal-wide">
+      <header>
+        <div><h3>Tạo nhóm</h3><p>Chỉ chọn từ danh sách bạn bè đã kết bạn.</p></div>
+        <button data-close-modal="groupModal" type="button" aria-label="Đóng">×</button>
+      </header>
+      <label class="modal-field">Tên nhóm
+        <input id="groupNameInput" maxlength="80" placeholder="Ví dụ: Gia đình" />
+      </label>
+      <input id="groupPeopleSearch" class="modal-search" placeholder="Tìm bạn bè..." />
+      <div id="groupFriendsPicker" class="people-picker"></div>
+      <footer>
+        <button data-close-modal="groupModal" class="secondary-btn" type="button">Hủy</button>
+        <button id="createGroupSubmitBtn" class="primary-btn" type="button">Tạo nhóm</button>
+      </footer>
+    </section>
+  </div>
+
+  <div id="categoryManagerModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card">
+      <header>
+        <div><h3>Quản lý phân loại</h3><p>Tạo thẻ màu và gắn cho từng cuộc trò chuyện.</p></div>
+        <button data-close-modal="categoryManagerModal" type="button" aria-label="Đóng">×</button>
+      </header>
+      <form id="categoryCreateForm" class="category-create-row">
+        <input id="categoryCreateColor" class="category-color-input" type="color" value="#43c77a" title="Chọn màu" />
+        <input id="categoryCreateName" maxlength="30" placeholder="Tên phân loại, ví dụ: Gia đình" />
+        <button class="primary-btn" type="submit">＋ Thêm</button>
+      </form>
+      <div id="categoryManagerList" class="category-manager-list"></div>
+      <p class="form-note">Phân loại được đồng bộ theo tài khoản Kalo trên các thiết bị.</p>
+      <footer><button data-close-modal="categoryManagerModal" class="secondary-btn" type="button">Đóng</button></footer>
+    </section>
+  </div>
+
+  <div id="pinnedMessagesModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card modal-wide">
+      <header>
+        <div><h3>Tin đã ghim</h3><p>Danh sách tin quan trọng trong cuộc trò chuyện này.</p></div>
+        <button data-close-modal="pinnedMessagesModal" type="button" aria-label="Đóng">×</button>
+      </header>
+      <div id="pinnedMessagesList" class="pinned-messages-list"></div>
+    </section>
+  </div>
+
+  <div id="forwardMessageModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card modal-wide">
+      <header>
+        <div><h3>Chuyển tiếp tin nhắn</h3><p>Chọn cuộc trò chuyện đích.</p></div>
+        <button data-close-modal="forwardMessageModal" type="button" aria-label="Đóng">×</button>
+      </header>
+      <input id="forwardConversationSearch" class="modal-search" placeholder="Tìm cuộc trò chuyện..." />
+      <div id="forwardConversationList" class="forward-conversation-list"></div>
+    </section>
+  </div>
+
+  <div id="avatarViewerModal" class="modal-backdrop avatar-viewer-backdrop hidden" role="dialog" aria-modal="true" aria-label="Xem ảnh đại diện">
+    <section class="avatar-viewer-card">
+      <button id="closeAvatarViewerBtn" class="avatar-viewer-close" type="button" aria-label="Đóng ảnh đại diện">×</button>
+      <img id="avatarViewerImage" class="avatar-viewer-image" alt="Ảnh đại diện" />
+      <div class="avatar-viewer-meta">
+        <div id="avatarViewerName" class="avatar-viewer-name"></div>
+        <div class="avatar-viewer-zoom-hint"><span id="avatarViewerZoomValue">100%</span> · Cuộn chuột để zoom · ESC để thoát</div>
+      </div>
+    </section>
+  </div>
+
+  <div id="avatarCropModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card avatar-crop-card">
+      <header>
+        <div><h3>Crop ảnh đại diện</h3><p>Kéo ảnh để chọn vị trí. Dùng thanh Zoom để phóng to/thu nhỏ.</p></div>
+        <button id="closeAvatarCropBtn" type="button" aria-label="Đóng">×</button>
+      </header>
+      <div id="avatarCropViewport" class="avatar-crop-viewport">
+        <canvas id="avatarCropCanvas" width="360" height="360" aria-label="Khung crop ảnh đại diện"></canvas>
+        <div class="avatar-crop-mask" aria-hidden="true"></div>
+        <div class="avatar-crop-hint" aria-hidden="true">Kéo ảnh để căn chỉnh</div>
+      </div>
+      <label class="avatar-zoom-row">
+        <span>Zoom</span>
+        <input id="avatarZoomRange" type="range" min="100" max="300" value="100" step="1" />
+        <output id="avatarZoomValue">100%</output>
+      </label>
+      <div class="avatar-crop-actions">
+        <button id="resetAvatarCropBtn" class="secondary-btn" type="button">Đặt lại</button>
+        <button id="cancelAvatarCropBtn" class="secondary-btn" type="button">Hủy</button>
+        <button id="applyAvatarCropBtn" class="primary-btn" type="button">Áp dụng Crop</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="contactAliasModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card">
+      <header>
+        <div><h3>Đặt biệt danh</h3><p id="contactOriginalName">Tên gốc</p></div>
+        <button data-close-modal="contactAliasModal" type="button" aria-label="Đóng">×</button>
+      </header>
+      <form id="contactAliasForm" class="stack">
+        <label>Biệt danh hiển thị<input id="contactAliasInput" maxlength="60" placeholder="Ví dụ: Vợ, Anh Nam, Kế toán..." /></label>
+        <p class="form-note">Biệt danh chỉ thay đổi cách hiển thị trên Kalo của bạn, không đổi tên thật của người kia.</p>
+        <div class="alias-modal-actions">
+          <button id="resetContactAliasBtn" class="secondary-btn" type="button">Dùng tên gốc</button>
+          <button class="primary-btn" type="submit">Lưu biệt danh</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="identityModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card">
+      <header><div><h3>Mở khóa tin nhắn</h3><p id="identityHint">Nhập mã khôi phục Kalo để mở lịch sử riêng tư trên thiết bị này.</p></div></header>
+      <label class="modal-field">Mã khôi phục<input id="identityCode" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" /></label>
+      <div id="identityError" class="error-text"></div>
+      <footer><button id="identitySubmit" class="primary-btn" type="button">Tiếp tục</button></footer>
+    </section>
+  </div>
+
+  <div id="recoveryCodeModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card">
+      <header><div><h3>Lưu mã khôi phục</h3><p>Giữ mã này ở nơi an toàn. Mã giúp bạn tạo lại mật khẩu và mở lịch sử tin nhắn trên thiết bị mới.</p></div></header>
+      <div id="recoveryCodeValue" class="recovery-code"></div>
+      <button id="copyRecoveryCode" class="secondary-btn" type="button">Sao chép mã</button>
+      <footer><button id="recoveryCodeDone" class="primary-btn" type="button">Tôi đã lưu mã</button></footer>
+    </section>
+  </div>
+
+  <div id="settingsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card">
+      <header><div><h3>Cài đặt Kalo</h3><p id="settingsAccount"></p></div><button data-close-modal="settingsModal">×</button></header>
+      <label class="setting-row"><span><strong>Che tin nhắn</strong><small>Làm mờ nội dung, rê chuột vào để xem.</small></span><input id="privacyToggle" type="checkbox" /></label>
+      <form id="profileForm" class="stack setting-block">
+        <h4>Hồ sơ</h4>
+        <div class="profile-avatar-editor">
+          <div id="profileAvatarPreview" class="profile-avatar-preview" aria-label="Avatar hiện tại">K</div>
+          <div class="profile-avatar-actions">
+            <strong>Ảnh đại diện</strong>
+            <small>Ảnh sẽ được nén tự động trước khi lưu.</small>
+            <div class="avatar-action-row">
+              <button id="chooseAvatarBtn" class="secondary-btn compact-btn" type="button">Chọn ảnh</button>
+              <button id="cropAvatarBtn" class="secondary-btn compact-btn" type="button">✂ Crop thủ công</button>
+              <button id="saveAvatarBtn" class="primary-btn compact-btn" type="button" disabled>Lưu Avatar</button>
+              <button id="removeAvatarBtn" class="secondary-btn compact-btn" type="button">Xóa ảnh</button>
+            </div>
+            <small id="avatarPendingHint" class="avatar-pending-hint hidden">Ảnh mới đang chờ lưu.</small>
+          </div>
+          <input id="avatarInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+        </div>
+        <label>Tên hiển thị<input id="displayNameInput" maxlength="80" /></label>
+        <button class="secondary-btn" type="submit">Lưu tên</button>
+      </form>
+      <form id="changePasswordForm" class="stack setting-block">
+        <h4>Đổi mật khẩu</h4>
+        <label>Mật khẩu mới<input id="newPasswordInput" type="password" minlength="8" /></label>
+        <label>Nhập lại<input id="newPasswordInput2" type="password" minlength="8" /></label>
+        <button class="secondary-btn" type="submit">Đổi mật khẩu</button>
+      </form>
+      <div class="setting-block storage-setting">
+        <h4>Quản lý dữ liệu</h4>
+        <div class="storage-summary">
+          <div>
+            <small>Vị trí My Documents và file nhận</small>
+            <strong id="settingsStorageLabel">Đang kiểm tra...</strong>
+          </div>
+          <button id="changeStorageBtn" class="secondary-btn" type="button">Thay đổi</button>
+        </div>
+        <div class="storage-meter"><span id="storageMeterBar"></span></div>
+        <p id="storageUsageText" class="form-note">Đang tính dung lượng cục bộ...</p>
+        <p class="form-note">Trên Chrome/Edge máy tính, nút Thay đổi cho phép bạn chọn thư mục thật trên ổ đĩa. Trên thiết bị không hỗ trợ, Kalo dùng vùng lưu trữ riêng của trình duyệt.</p>
+      </div>
+      <div class="setting-block">
+        <h4>File & kết nối</h4>
+        <p class="form-note">File ≤ 10 MB có thêm bản relay mã hóa tạm thời để người nhận vẫn tải được khi máy gửi đã offline. File lớn tiếp tục truyền P2P. TURN là tùy chọn để tăng khả năng kết nối ở mạng công ty/NAT khó.</p>
+        <div class="turn-settings-grid">
+          <label>TURN URL<input id="turnUrlInput" placeholder="turn:server.example.com:3478" /></label>
+          <label>Tên đăng nhập<input id="turnUsernameInput" autocomplete="off" /></label>
+          <label>Mật khẩu TURN<input id="turnCredentialInput" type="password" autocomplete="new-password" /></label>
+        </div>
+        <button id="saveTurnConfigBtn" class="secondary-btn" type="button">Lưu cấu hình TURN</button>
+      </div>
+      <div class="setting-block">
+        <h4>Sao lưu / Khôi phục</h4>
+        <p class="form-note">Backup gồm biệt danh, phân loại, ghim/lưu trữ, draft, cài đặt cá nhân và timeline My Documents. Bạn có thể đặt mật khẩu AES-GCM khi xuất. File nhị phân và khóa mã hóa tin nhắn không được nhúng vào backup.</p>
+        <div class="backup-actions">
+          <button id="exportBackupBtn" class="secondary-btn" type="button">Xuất backup Kalo</button>
+          <button id="importBackupBtn" class="secondary-btn" type="button">Nhập backup</button>
+          <input id="backupImportInput" type="file" accept="application/json,.json,.kalo-backup" hidden />
+        </div>
+      </div>
+      <footer><button id="logoutBtn" class="danger-btn logout-icon-btn" type="button"><img class="logout-icon-img" src="data:image/png;base64,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" alt="" /><span>Đăng xuất</span></button></footer>
+    </section>
+  </div>
+
+  <div id="incomingCallModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="call-incoming-card">
+      <div class="call-avatar" id="incomingCallAvatar">K</div>
+      <h3 id="incomingCallName">Cuộc gọi đến</h3>
+      <p id="incomingCallType">Đang gọi thoại...</p>
+      <div class="incoming-call-actions">
+        <button id="rejectCallBtn" class="call-circle danger" type="button" title="Từ chối">✕</button>
+        <button id="acceptCallBtn" class="call-circle accept" type="button" title="Trả lời">✓</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="callModal" class="call-screen hidden" role="dialog" aria-modal="true">
+    <div class="call-topbar">
+      <div>
+        <strong id="callPeerName">Cuộc gọi Kalo</strong>
+        <small id="callStatus">Đang kết nối...</small>
+      </div>
+      <span id="callModeLabel">Gọi thoại</span>
+    </div>
+    <div class="call-stage">
+      <video id="remoteCallVideo" autoplay playsinline></video>
+      <audio id="remoteCallAudio" autoplay></audio>
+      <div id="audioCallPlaceholder" class="audio-call-placeholder">
+        <div class="call-avatar large" id="activeCallAvatar">K</div>
+        <strong id="activeCallName">Kalo</strong>
+      </div>
+      <video id="localCallVideo" autoplay playsinline muted></video>
+    </div>
+    <div class="call-controls">
+      <button id="muteCallBtn" class="call-control" type="button" title="Tắt/bật mic">🎙</button>
+      <button id="cameraCallBtn" class="call-control" type="button" title="Tắt/bật camera">📷</button>
+      <button id="hangupCallBtn" class="call-control hangup" type="button" title="Kết thúc">☎</button>
+    </div>
+  </div>
+
+  <div id="toastHost" class="toast-host" aria-live="polite"></div>
+
+  <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
+  <script type="module" src="./app.js?v=1.7.0"></script>
+</body>
+</html>
