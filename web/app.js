@@ -158,6 +158,7 @@ function formatTime(value) {
 }
 function notifyParentOfIncomingMessage(row) {
   if (!row || !state.user || row.sender_id === state.user.id) return;
+  if (state.conversationPrefs?.[row.conversation_id]?.muted) return;
   const conv = state.conversations.find((item) => item.id === row.conversation_id) || null;
   const senderName = profileName(row.sender_id);
   const conversationName = conv ? conversationLabel(conv) : 'Kalo';
@@ -720,7 +721,9 @@ function updateCategoryFilterButton() {
 }
 
 function setCategoryFilter(categoryId = 'all') {
-  state.activeCategoryFilter = categoryById(categoryId) ? categoryId : 'all';
+  state.activeCategoryFilter = categoryId === 'archived'
+    ? 'archived'
+    : (categoryById(categoryId) ? categoryId : 'all');
   hide('#categoryFilterMenu');
   updateCategoryFilterButton();
   renderCategoryFilterMenu();
@@ -740,6 +743,7 @@ function renderCategoryFilterMenu() {
         <span>${escapeHtml(item.name)}</span>
       </button>`).join('')}
     <div class="category-menu-separator"></div>
+    <button class="category-menu-item ${state.activeCategoryFilter === 'archived' ? 'active' : ''}" type="button" data-category-filter="archived">🗄 <span>Đã lưu trữ</span></button>
     <button class="category-menu-item manage" type="button" data-manage-categories>⚙ <span>Quản lý phân loại</span></button>
   `;
   $$('[data-category-filter]', root).forEach((btn) => btn.addEventListener('click', () => setCategoryFilter(btn.dataset.categoryFilter)));
@@ -857,11 +861,30 @@ function assignConversationCategory(conversationId, categoryId = '') {
   renderConversationList();
 }
 
+async function setConversationPreferenceFlag(conversationId, field, value) {
+  if (!conversationId || !['pinned', 'muted', 'archived'].includes(field)) return;
+  const previous = { ...(state.conversationPrefs?.[conversationId] || {}) };
+  state.conversationPrefs[conversationId] = {
+    ...previous,
+    conversation_id: conversationId,
+    [field]: Boolean(value),
+  };
+  renderConversationList();
+  try {
+    await state.preferencesManager?.setConversationFlag(conversationId, field, value);
+  } catch (error) {
+    state.conversationPrefs[conversationId] = previous;
+    renderConversationList();
+    toast('Không đồng bộ được tùy chọn cuộc trò chuyện.', 'error');
+  }
+}
+
 function openConversationCategoryMenu(conversationId, anchor) {
   const root = $('#conversationCategoryMenu');
   if (!root || !anchor) return;
   state.categoryMenuConversationId = conversationId;
   const activeId = state.conversationCategoryMap[conversationId] || '';
+  const pref = state.conversationPrefs?.[conversationId] || {};
   root.innerHTML = `
     <button class="category-menu-item ${!activeId ? 'active' : ''}" type="button" data-assign-category="">○ <span>Không phân loại</span></button>
     ${state.conversationCategories.map((item) => `
@@ -870,10 +893,18 @@ function openConversationCategoryMenu(conversationId, anchor) {
         <span>${escapeHtml(item.name)}</span>
       </button>`).join('')}
     <div class="category-menu-separator"></div>
+    <button class="category-menu-item" type="button" data-conv-flag="pinned" data-conv-value="${pref.pinned ? '0' : '1'}">${pref.pinned ? '📍' : '📌'} <span>${pref.pinned ? 'Bỏ ghim cuộc trò chuyện' : 'Ghim cuộc trò chuyện'}</span></button>
+    <button class="category-menu-item" type="button" data-conv-flag="muted" data-conv-value="${pref.muted ? '0' : '1'}">${pref.muted ? '🔔' : '🔕'} <span>${pref.muted ? 'Bật thông báo' : 'Tắt thông báo'}</span></button>
+    <button class="category-menu-item" type="button" data-conv-flag="archived" data-conv-value="${pref.archived ? '0' : '1'}">${pref.archived ? '↩' : '🗄'} <span>${pref.archived ? 'Bỏ lưu trữ' : 'Lưu trữ cuộc trò chuyện'}</span></button>
+    <div class="category-menu-separator"></div>
     <button class="category-menu-item manage" type="button" data-manage-categories>⚙ <span>Quản lý phân loại</span></button>
   `;
   $$('[data-assign-category]', root).forEach((btn) => btn.addEventListener('click', () => {
     assignConversationCategory(conversationId, btn.dataset.assignCategory || '');
+  }));
+  $$('[data-conv-flag]', root).forEach((btn) => btn.addEventListener('click', async () => {
+    await setConversationPreferenceFlag(conversationId, btn.dataset.convFlag, btn.dataset.convValue === '1');
+    hide(root);
   }));
   $('[data-manage-categories]', root)?.addEventListener('click', () => {
     hide(root);
@@ -1777,8 +1808,11 @@ function renderConversationList() {
 
   const visible = sorted.filter((conv) => {
     const queryOk = conversationLabel(conv).toLowerCase().includes(query);
-    const categoryOk = state.activeCategoryFilter === 'all'
-      || state.conversationCategoryMap[conv.id] === state.activeCategoryFilter;
+    const archived = Boolean(state.conversationPrefs?.[conv.id]?.archived);
+    const categoryOk = state.activeCategoryFilter === 'archived'
+      ? archived
+      : (!archived && (state.activeCategoryFilter === 'all'
+        || state.conversationCategoryMap[conv.id] === state.activeCategoryFilter));
     return queryOk && categoryOk;
   });
 
