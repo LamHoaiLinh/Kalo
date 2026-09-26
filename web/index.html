@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.6.5" />
+  <link rel="stylesheet" href="./styles.css?v=1.7.0" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -171,6 +171,7 @@
             <button id="messageSearchBtn" class="icon-btn" type="button" title="Tìm trong cuộc trò chuyện" aria-label="Tìm trong cuộc trò chuyện">🔍</button>
             <button id="audioCallBtn" class="icon-btn" type="button" title="Gọi thoại">📞</button>
             <button id="videoCallBtn" class="icon-btn" type="button" title="Gọi video">🎥</button>
+            <button id="pinnedMessagesBtn" class="icon-btn" type="button" title="Tin đã ghim">📌</button>
             <button id="chatInfoBtn" class="icon-btn" type="button" title="Thông tin">ⓘ</button>
           </div>
         </header>
@@ -207,6 +208,13 @@
           <div id="stickerGrid" class="sticker-grid"></div>
         </div>
 
+        <div id="replyComposerBar" class="reply-composer-bar hidden">
+          <div>
+            <strong>Đang trả lời</strong>
+            <span id="replyComposerText"></span>
+          </div>
+          <button id="cancelReplyBtn" type="button" aria-label="Hủy trả lời">×</button>
+        </div>
         <footer class="composer">
           <input id="imageInput" type="file" accept="image/*" hidden />
           <input id="fileInput" type="file" hidden />
@@ -297,8 +305,29 @@
         <button class="primary-btn" type="submit">＋ Thêm</button>
       </form>
       <div id="categoryManagerList" class="category-manager-list"></div>
-      <p class="form-note">Phân loại là cách sắp xếp cá nhân và hiện được lưu trên thiết bị này.</p>
+      <p class="form-note">Phân loại được đồng bộ theo tài khoản Kalo trên các thiết bị.</p>
       <footer><button data-close-modal="categoryManagerModal" class="secondary-btn" type="button">Đóng</button></footer>
+    </section>
+  </div>
+
+  <div id="pinnedMessagesModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card modal-wide">
+      <header>
+        <div><h3>Tin đã ghim</h3><p>Danh sách tin quan trọng trong cuộc trò chuyện này.</p></div>
+        <button data-close-modal="pinnedMessagesModal" type="button" aria-label="Đóng">×</button>
+      </header>
+      <div id="pinnedMessagesList" class="pinned-messages-list"></div>
+    </section>
+  </div>
+
+  <div id="forwardMessageModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <section class="modal-card modal-wide">
+      <header>
+        <div><h3>Chuyển tiếp tin nhắn</h3><p>Chọn cuộc trò chuyện đích.</p></div>
+        <button data-close-modal="forwardMessageModal" type="button" aria-label="Đóng">×</button>
+      </header>
+      <input id="forwardConversationSearch" class="modal-search" placeholder="Tìm cuộc trò chuyện..." />
+      <div id="forwardConversationList" class="forward-conversation-list"></div>
     </section>
   </div>
 
@@ -416,8 +445,23 @@
         <p class="form-note">Trên Chrome/Edge máy tính, nút Thay đổi cho phép bạn chọn thư mục thật trên ổ đĩa. Trên thiết bị không hỗ trợ, Kalo dùng vùng lưu trữ riêng của trình duyệt.</p>
       </div>
       <div class="setting-block">
-        <h4>File lớn</h4>
-        <p class="form-note">File được truyền trực tiếp giữa hai máy. Người gửi và người nhận cần cùng online. Kalo không lưu nội dung file trên máy chủ.</p>
+        <h4>File & kết nối</h4>
+        <p class="form-note">File ≤ 10 MB có thêm bản relay mã hóa tạm thời để người nhận vẫn tải được khi máy gửi đã offline. File lớn tiếp tục truyền P2P. TURN là tùy chọn để tăng khả năng kết nối ở mạng công ty/NAT khó.</p>
+        <div class="turn-settings-grid">
+          <label>TURN URL<input id="turnUrlInput" placeholder="turn:server.example.com:3478" /></label>
+          <label>Tên đăng nhập<input id="turnUsernameInput" autocomplete="off" /></label>
+          <label>Mật khẩu TURN<input id="turnCredentialInput" type="password" autocomplete="new-password" /></label>
+        </div>
+        <button id="saveTurnConfigBtn" class="secondary-btn" type="button">Lưu cấu hình TURN</button>
+      </div>
+      <div class="setting-block">
+        <h4>Sao lưu / Khôi phục</h4>
+        <p class="form-note">Backup gồm biệt danh, phân loại, draft, cài đặt cá nhân và timeline My Documents. File nhị phân trong thư mục My Documents không được nhúng vào backup để tránh file quá lớn.</p>
+        <div class="backup-actions">
+          <button id="exportBackupBtn" class="secondary-btn" type="button">Xuất backup Kalo</button>
+          <button id="importBackupBtn" class="secondary-btn" type="button">Nhập backup</button>
+          <input id="backupImportInput" type="file" accept="application/json,.json,.kalo-backup" hidden />
+        </div>
       </div>
       <footer><button id="logoutBtn" class="danger-btn logout-icon-btn" type="button"><img class="logout-icon-img" src="data:image/png;base64,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" alt="" /><span>Đăng xuất</span></button></footer>
     </section>
@@ -462,6 +506,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.6.5"></script>
+  <script type="module" src="./app.js?v=1.7.0"></script>
 </body>
 </html>
