@@ -191,6 +191,12 @@ create policy "kalo small files members delete" on storage.objects for delete us
   bucket_id='kalo-small-files' and private.kalo_storage_conversation_access(name,(select auth.uid()))
 );
 
+drop policy if exists "kalo reads members select" on public.kalo_reads;
+create policy "kalo reads members select" on public.kalo_reads for select using (
+  private.kalo_is_member(conversation_id, (select auth.uid()))
+  or private.kalo_is_owner(conversation_id, (select auth.uid()))
+);
+
 create or replace function public.kalo_unread_counts()
 returns table(conversation_id uuid, unread_count bigint)
 language sql stable security invoker set search_path=public
