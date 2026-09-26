@@ -594,6 +594,21 @@ function cancelAvatarCrop() {
   if (returnToSettings) show('#settingsModal');
 }
 
+async function migrateLegacyAvatarIfNeeded() {
+  const current = String(state.profile?.avatar_url || '');
+  if (!current.startsWith('data:image/')) return;
+  try {
+    const storedUrl = await uploadAvatar(supabase, state.user.id, current);
+    const { error } = await supabase.from('kalo_profiles')
+      .update({ avatar_url: storedUrl, updated_at: new Date().toISOString() })
+      .eq('user_id', state.user.id);
+    if (error) throw error;
+    state.profile.avatar_url = storedUrl;
+  } catch (error) {
+    console.warn('Kalo legacy avatar migration failed', error);
+  }
+}
+
 async function saveOwnAvatar(avatarUrl) {
   let storedUrl = '';
   if (avatarUrl) {
@@ -2898,6 +2913,7 @@ async function startApp(session) {
     state.session = session;
     state.user = session.user;
     state.profile = await getProfile(session.user.id);
+    await migrateLegacyAvatarIfNeeded();
     loadConversationCategories();
     loadContactAliases();
     await hydrateSyncedPreferences();
@@ -3626,6 +3642,14 @@ function bindAppEvents() {
         );
         state.conversationCategoryMap = assignments;
         await state.preferencesManager?.replaceCategories(state.conversationCategories, assignments);
+      }
+      if (backup.preferences?.conversationPrefs && state.preferencesManager) {
+        state.conversationPrefs = { ...backup.preferences.conversationPrefs };
+        await state.preferencesManager.replaceConversationPrefs(state.conversationPrefs);
+      }
+      if (Array.isArray(backup.preferences?.pins) && state.preferencesManager) {
+        state.messagePins = [...backup.preferences.pins];
+        await state.preferencesManager.replacePins(state.messagePins);
       }
       importDrafts(state.user.id, backup.drafts || {});
       if (Array.isArray(backup.myDocumentsTimeline) && state.documentsManager) {
