@@ -869,6 +869,51 @@ function openConversationCategoryMenu(conversationId, anchor) {
   hide('#categoryFilterMenu');
 }
 
+async function hydrateSyncedPreferences() {
+  if (!state.user) return;
+  state.preferencesManager = new KaloPreferences(supabase, state.user.id);
+  try {
+    const remote = await state.preferencesManager.load();
+    const hasRemote = Object.keys(remote.aliases || {}).length
+      || (remote.categories || []).length
+      || Object.keys(remote.conversationPrefs || {}).length
+      || (remote.pins || []).length;
+    if (hasRemote) {
+      state.contactAliases = { ...(remote.aliases || {}) };
+      if ((remote.categories || []).length) {
+        state.conversationCategories = remote.categories.map((item) => ({
+          id: item.id,
+          name: item.name,
+          color: safeCategoryColor(item.color),
+        }));
+      }
+      state.conversationPrefs = { ...(remote.conversationPrefs || {}) };
+      state.conversationCategoryMap = Object.fromEntries(
+        Object.entries(state.conversationPrefs)
+          .filter(([, pref]) => pref?.category_id)
+          .map(([conversationId, pref]) => [conversationId, pref.category_id])
+      );
+      state.messagePins = remote.pins || [];
+      try {
+        localStorage.setItem(contactAliasStorageKey(), JSON.stringify(state.contactAliases));
+        localStorage.setItem(categoryStorageKey(), JSON.stringify({
+          version: 2,
+          categories: state.conversationCategories,
+          assignments: state.conversationCategoryMap,
+        }));
+      } catch {}
+    } else {
+      await state.preferencesManager.replaceAliases(state.contactAliases);
+      await state.preferencesManager.replaceCategories(state.conversationCategories, state.conversationCategoryMap);
+      state.conversationPrefs = {};
+      state.messagePins = [];
+    }
+  } catch (error) {
+    console.warn('Kalo preference sync unavailable, using local cache', error);
+  }
+  updateCategoryFilterButton();
+}
+
 async function setSessionFromResponse(session) {
   if (!session?.access_token || !session?.refresh_token) throw new Error('Phiên đăng nhập không hợp lệ.');
   const { error } = await supabase.auth.setSession({
@@ -2610,12 +2655,16 @@ async function startApp(session) {
     state.profile = await getProfile(session.user.id);
     loadConversationCategories();
     loadContactAliases();
+    await hydrateSyncedPreferences();
     state.identity = await ensureUserIdentity(state.pendingRecoveryCode);
     state.pendingRecoveryCode = null;
+    state.messageService = new KaloMessageService(supabase, state.user.id, state.identity, 100);
 
     await loadProfiles();
     await initLocalDocuments();
     await Promise.all([loadFriendships(), loadConversations()]);
+    await refreshUnreadCounts();
+    cleanupExpiredRelays(supabase, state.user.id).catch(() => {});
     await startRealtime();
 
     hide('#authScreen');
@@ -2678,6 +2727,13 @@ async function logout() {
   state.activeCategoryFilter = 'all';
   state.categoryMenuConversationId = null;
   state.contactAliases = {};
+  state.preferencesManager = null;
+  state.messageService = null;
+  state.conversationPrefs = {};
+  state.unreadCounts = new Map();
+  state.currentReads = [];
+  state.messagePins = [];
+  state.replyingToId = null;
   state.avatarPendingDataUrl = '';
   closeAvatarCropSource();
   clearCallUi();
