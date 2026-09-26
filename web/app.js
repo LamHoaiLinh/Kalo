@@ -1631,6 +1631,9 @@ function renderConversationList() {
   if (!list) return;
   const query = $('#conversationSearch')?.value.trim().toLowerCase() || '';
   const sorted = [...state.conversations].sort((a, b) => {
+    const ap = Boolean(state.conversationPrefs?.[a.id]?.pinned);
+    const bp = Boolean(state.conversationPrefs?.[b.id]?.pinned);
+    if (ap !== bp) return bp - ap;
     const at = state.previews.get(a.id)?.created_at || a.created_at;
     const bt = state.previews.get(b.id)?.created_at || b.created_at;
     return new Date(bt) - new Date(at);
@@ -1656,14 +1659,19 @@ function renderConversationList() {
     const categoryBadge = category
       ? `<span class="conv-category-badge" style="--category-color:${safeCategoryColor(category.color)}"><i></i>${escapeHtml(category.name)}</span>`
       : '';
+    const draft = getDraft(state.user?.id, conv.id);
+    const unread = Number(state.unreadCounts.get(conv.id) || 0);
+    const pref = state.conversationPrefs?.[conv.id] || {};
+    const previewText = draft ? `Bản nháp: ${draft}` : (preview?.text || 'Bắt đầu trò chuyện');
+    const statusBits = `${pref.pinned ? '📌' : ''}${pref.muted ? '🔕' : ''}`;
     return `<div class="conv-row ${conv.id === state.currentConversationId ? 'active' : ''}">
       <button class="conv-item ${conv.id === state.currentConversationId ? 'active' : ''}" data-conv-id="${conv.id}" type="button">
         <div class="avatar ${safeAvatarUrl(peerProfile?.avatar_url) ? 'has-image avatar-clickable' : ''}" ${otherId ? `data-avatar-user="${escapeHtml(otherId)}" title="Bấm để xem ảnh đại diện"` : ''}>${avatarHtml}</div>
         <div class="conv-main">
           <div class="conv-name-line"><div class="conv-name">${escapeHtml(label)}${online ? ' · 🟢' : ''}</div>${categoryBadge}</div>
-          <div class="conv-preview">${escapeHtml(preview?.text || 'Bắt đầu trò chuyện')}</div>
+          <div class="conv-preview ${draft ? 'draft' : ''}">${escapeHtml(previewText)}</div>
         </div>
-        <div class="conv-meta">${escapeHtml(formatTime(preview?.created_at || conv.created_at))}</div>
+        <div class="conv-meta">${statusBits ? `<span class="conv-status-bits">${statusBits}</span>` : ''}<span>${escapeHtml(formatTime(preview?.created_at || conv.created_at))}</span>${unread > 0 ? `<b class="conv-unread-badge">${unread > 99 ? '99+' : unread}</b>` : ''}</div>
       </button>
       <button class="conv-classify-btn" type="button" data-classify-conv="${conv.id}" title="Phân loại cuộc trò chuyện" aria-label="Phân loại ${escapeHtml(label)}">
         <span style="--category-color:${category ? safeCategoryColor(category.color) : '#aebdb5'}"></span>🏷
