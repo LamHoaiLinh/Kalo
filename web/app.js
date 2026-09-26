@@ -2923,7 +2923,9 @@ function renderMessageSearchResults(matches = null) {
       <small>${escapeHtml(new Date(m.created_at).toLocaleString('vi-VN'))}</small>
     </button>`;
   }).join('') || '<div class="message-search-empty">Không có tin nhắn phù hợp.</div>';
-  $$('[data-search-message-id]', root).forEach((btn) => btn.addEventListener('click', () => jumpToSearchMessage(btn.dataset.searchMessageId)));
+  $('[data-search-message-id]', root).forEach((btn) => btn.addEventListener('click', () => {
+    jumpToSearchMessage(btn.dataset.searchMessageId).catch((e) => toast(e.message || 'Không mở được kết quả tìm kiếm.', 'error'));
+  }));
 }
 
 async function runMessageSearch() {
@@ -2971,8 +2973,12 @@ async function jumpToMessageById(messageId) {
   setTimeout(() => row.classList.remove('search-hit'), 1800);
 }
 
-function jumpToSearchMessage(messageId) {
-  const source = state.currentView === 'documents' ? state.myDocumentMessages : state.messageSearchCache;
+async function jumpToSearchMessage(messageId) {
+  if (state.currentView !== 'documents') {
+    await jumpToMessageById(messageId);
+    return;
+  }
+  const source = state.myDocumentMessages;
   const found = source.find((m) => m.id === messageId);
   if (!found) return;
   if (!state.messages.some((m) => m.id === messageId)) {
