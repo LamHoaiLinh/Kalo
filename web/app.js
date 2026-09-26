@@ -328,9 +328,6 @@ function saveContactAliases() {
   const key = contactAliasStorageKey();
   if (!key) return;
   localStorage.setItem(key, JSON.stringify(state.contactAliases || {}));
-  state.preferencesManager?.replaceAliases(state.contactAliases).catch((error) => {
-    console.warn('Kalo alias sync failed', error);
-  });
 }
 
 function contactAlias(userId) {
@@ -653,6 +650,9 @@ function saveCurrentContactAlias(value) {
   if (clean) state.contactAliases[peerId] = clean;
   else delete state.contactAliases[peerId];
   saveContactAliases();
+  state.preferencesManager?.saveAlias(peerId, clean).catch((error) => {
+    console.warn('Kalo alias sync failed', error);
+  });
   hide('#contactAliasModal');
   renderConversationList();
   renderPeopleList();
@@ -699,9 +699,6 @@ function saveConversationCategories() {
     categories: state.conversationCategories,
     assignments: state.conversationCategoryMap,
   }));
-  state.preferencesManager?.replaceCategories(state.conversationCategories, state.conversationCategoryMap).catch((error) => {
-    console.warn('Kalo category sync failed', error);
-  });
 }
 
 function categoryById(id) {
@@ -776,14 +773,22 @@ function renderCategoryManager() {
     </div>
   `).join('') || '<div class="category-empty">Chưa có phân loại. Hãy tạo một thẻ mới ở phía trên.</div>';
 
-  $$('[data-category-color]', root).forEach((input) => input.addEventListener('input', () => {
-    const item = categoryById(input.dataset.categoryColor);
-    if (!item) return;
-    item.color = safeCategoryColor(input.value, item.color);
-    saveConversationCategories();
-    renderCategoryFilterMenu();
-    renderConversationList();
-  }));
+  $('[data-category-color]', root).forEach((input) => {
+    input.addEventListener('input', () => {
+      const item = categoryById(input.dataset.categoryColor);
+      if (!item) return;
+      item.color = safeCategoryColor(input.value, item.color);
+      saveConversationCategories();
+      renderCategoryFilterMenu();
+      renderConversationList();
+    });
+    input.addEventListener('change', () => {
+      const item = categoryById(input.dataset.categoryColor);
+      if (!item) return;
+      const sortOrder = Math.max(0, state.conversationCategories.findIndex((x) => x.id === item.id));
+      state.preferencesManager?.saveCategory(item, sortOrder).catch((error) => console.warn('Kalo category color sync failed', error));
+    });
+  });
   $$('[data-category-name]', root).forEach((input) => input.addEventListener('change', () => {
     const item = categoryById(input.dataset.categoryName);
     if (!item) return;
@@ -794,6 +799,8 @@ function renderCategoryManager() {
     }
     item.name = name;
     saveConversationCategories();
+    const sortOrder = Math.max(0, state.conversationCategories.findIndex((x) => x.id === item.id));
+    state.preferencesManager?.saveCategory(item, sortOrder).catch((error) => console.warn('Kalo category name sync failed', error));
     renderCategoryFilterMenu();
     renderConversationList();
   }));
@@ -2024,7 +2031,7 @@ function renderMessages() {
     const timeBits = [
       formatTime(m.created_at),
       m.edited_at ? 'đã sửa' : '',
-      seen ? 'Đã xem' : '',
+      own && !m.localDocument ? (seen ? 'Đã xem' : 'Đã gửi') : '',
     ].filter(Boolean).join(' · ');
 
     const actions = m.localDocument
@@ -3677,7 +3684,10 @@ function bindAppEvents() {
         local: {
           privacy: document.body.classList.contains('privacy-mode'),
           rememberLogin: rememberLoginEnabled(),
-          turn: loadTurnConfig(),
+          turn: (() => {
+            const turn = loadTurnConfig();
+            return turn ? { url: turn.url, username: turn.username || '', credential: '' } : null;
+          })(),
         },
         myDocumentsTimeline: timeline || [],
       }, `Kalo_Backup_${state.profile?.username || 'user'}_${new Date().toISOString().slice(0,10)}.json`);
