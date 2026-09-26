@@ -121,6 +121,41 @@ export class KaloPreferences {
     if (error) throw error;
   }
 
+  async replaceConversationPrefs(prefs = {}) {
+    const rows = Object.entries(prefs || {}).map(([conversation_id, pref]) => ({
+      user_id: this.userId,
+      conversation_id,
+      category_id: pref?.category_id || null,
+      pinned: Boolean(pref?.pinned),
+      muted: Boolean(pref?.muted),
+      archived: Boolean(pref?.archived),
+      updated_at: new Date().toISOString(),
+    }));
+    const { error: deleteError } = await this.supabase.from('kalo_conversation_prefs')
+      .delete().eq('user_id', this.userId);
+    if (deleteError) throw deleteError;
+    if (!rows.length) return;
+    const { error } = await this.supabase.from('kalo_conversation_prefs').insert(rows);
+    if (error) throw error;
+  }
+
+  async replacePins(pins = []) {
+    const rows = (pins || [])
+      .filter((pin) => pin?.conversation_id && pin?.message_id)
+      .map((pin) => ({
+        user_id: this.userId,
+        conversation_id: pin.conversation_id,
+        message_id: pin.message_id,
+        created_at: pin.created_at || new Date().toISOString(),
+      }));
+    const { error: deleteError } = await this.supabase.from('kalo_message_pins')
+      .delete().eq('user_id', this.userId);
+    if (deleteError) throw deleteError;
+    if (!rows.length) return;
+    const { error } = await this.supabase.from('kalo_message_pins').insert(rows);
+    if (error) throw error;
+  }
+
   async pinMessage(conversationId, messageId) {
     const { error } = await this.supabase.from('kalo_message_pins').upsert({
       user_id: this.userId,
