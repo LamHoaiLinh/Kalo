@@ -715,9 +715,10 @@ function updateCategoryFilterButton() {
   const dot = $('#categoryFilterDot');
   if (!label || !dot) return;
   const active = categoryById(state.activeCategoryFilter);
-  label.textContent = active?.name || 'Phân loại';
-  dot.style.background = active?.color || 'transparent';
-  dot.classList.toggle('empty', !active);
+  const archived = state.activeCategoryFilter === 'archived';
+  label.textContent = archived ? 'Đã lưu trữ' : (active?.name || 'Phân loại');
+  dot.style.background = archived ? '#7f9188' : (active?.color || 'transparent');
+  dot.classList.toggle('empty', !active && !archived);
 }
 
 function setCategoryFilter(categoryId = 'all') {
