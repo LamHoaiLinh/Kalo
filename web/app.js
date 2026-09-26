@@ -3748,7 +3748,7 @@ function bindAppEvents() {
           })(),
         },
         myDocumentsTimeline: timeline || [],
-      }, `Kalo_Backup_${state.profile?.username || 'user'}_${new Date().toISOString().slice(0,10)}.json`, backupPassword);
+      }, `Kalo_Backup_${state.profile?.username || 'user'}_${new Date().toISOString().slice(0,10)}.kalo-backup`, backupPassword);
       toast(backupPassword ? 'Đã xuất backup Kalo có mã hóa mật khẩu.' : 'Đã xuất backup Kalo.');
     } catch (error) {
       toast(error.message || 'Không xuất được backup.', 'error');
@@ -3769,6 +3769,9 @@ function bindAppEvents() {
         const password = window.prompt('Nhập mật khẩu của file backup Kalo:', '');
         if (password === null) return;
         backup = await readBackupFile(file, password);
+      }
+      if (backup.account?.username && backup.account.username !== state.profile?.username) {
+        throw new Error(`Backup này thuộc tài khoản @${backup.account.username}, không phải @${state.profile?.username || ''}.`);
       }
       if (backup.preferences?.aliases) {
         state.contactAliases = { ...backup.preferences.aliases };
