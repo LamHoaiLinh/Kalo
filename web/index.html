@@ -8,7 +8,7 @@
   <title>Kalo</title>
   <link rel="icon" href="./icon.svg" />
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./styles.css?v=1.7.1" />
+  <link rel="stylesheet" href="./styles.css?v=1.7.2" />
 </head>
 <body>
   <main id="authScreen" class="auth-screen">
@@ -342,6 +342,20 @@
     </section>
   </div>
 
+  <div id="messageImageViewerModal" class="modal-backdrop message-image-viewer-backdrop hidden" role="dialog" aria-modal="true" aria-label="Xem ảnh tin nhắn">
+    <section class="message-image-viewer-card">
+      <button id="closeMessageImageViewerBtn" class="message-image-viewer-close" type="button" aria-label="Đóng ảnh">×</button>
+      <div id="messageImageViewerStage" class="message-image-viewer-stage">
+        <img id="messageImageViewerImage" class="message-image-viewer-image" alt="Ảnh trong tin nhắn" />
+        <div id="messageImageViewerLoading" class="message-image-viewer-loading hidden">Đang mở ảnh gốc…</div>
+      </div>
+      <div class="message-image-viewer-meta">
+        <div id="messageImageViewerName" class="message-image-viewer-name"></div>
+        <div class="message-image-viewer-zoom-hint"><span id="messageImageViewerZoomValue">100%</span> · Cuộn chuột để zoom · Nhấp đúp để đặt lại · ESC để thoát</div>
+      </div>
+    </section>
+  </div>
+
   <div id="avatarCropModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
     <section class="modal-card avatar-crop-card">
       <header>
@@ -506,6 +520,6 @@
   <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
   <script src="./vendor/qrcode.min.js?v=1.0.0"></script>
-  <script type="module" src="./app.js?v=1.7.1"></script>
+  <script type="module" src="./app.js?v=1.7.2"></script>
 </body>
 </html>
