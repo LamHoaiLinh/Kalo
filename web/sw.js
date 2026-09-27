@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v20-paste-images';
+const CACHE='kalo-native-v21-full-image-viewer';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.7.1',
-  './app.js?v=1.7.1',
+  './styles.css?v=1.7.2',
+  './app.js?v=1.7.2',
   './config.js',
   './crypto.js',
   './webrtc.js',
