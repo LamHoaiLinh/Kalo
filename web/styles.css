@@ -1627,3 +1627,139 @@ body{overflow:hidden}
   .turn-settings-grid label:first-child{grid-column:auto}
   .msg-actions{flex-wrap:wrap}
 }
+
+
+/* v1.7.2 - Full-screen viewer for chat images */
+.image-preview,
+.image-preview-placeholder{
+  cursor:zoom-in;
+}
+.image-preview:hover{
+  box-shadow:0 0 0 2px rgba(75,173,120,.18);
+}
+.message-image-viewer-backdrop{
+  z-index:7350;
+  background:rgba(5,12,9,.92);
+  backdrop-filter:blur(4px);
+}
+.message-image-viewer-card{
+  position:relative;
+  width:100vw;
+  height:100vh;
+  height:100dvh;
+  max-width:none;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:54px 20px 18px;
+  background:transparent;
+  overflow:hidden;
+}
+.message-image-viewer-stage{
+  position:relative;
+  flex:1 1 auto;
+  width:100%;
+  min-height:0;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+}
+.message-image-viewer-image{
+  display:block;
+  max-width:calc(100vw - 40px);
+  max-height:calc(100dvh - 112px);
+  width:auto;
+  height:auto;
+  object-fit:contain;
+  transform-origin:center center;
+  transition:transform .07s ease-out;
+  will-change:transform;
+  cursor:zoom-in;
+  user-select:none;
+  -webkit-user-drag:none;
+  border-radius:8px;
+  box-shadow:0 20px 70px rgba(0,0,0,.42);
+}
+.message-image-viewer-close{
+  position:absolute;
+  top:12px;
+  right:14px;
+  z-index:5;
+  width:42px;
+  height:42px;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:50%;
+  background:rgba(255,255,255,.95);
+  color:#284d3d;
+  display:grid;
+  place-items:center;
+  padding:0;
+  font-size:27px;
+  line-height:1;
+  cursor:pointer;
+  box-shadow:0 7px 22px rgba(0,0,0,.28);
+}
+.message-image-viewer-close:hover{
+  transform:scale(1.07);
+  background:#fff;
+}
+.message-image-viewer-meta{
+  flex:0 0 auto;
+  position:relative;
+  z-index:3;
+  max-width:min(90vw,900px);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  color:#fff;
+  pointer-events:none;
+}
+.message-image-viewer-name{
+  max-width:min(90vw,900px);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px;
+  font-weight:850;
+  text-shadow:0 2px 8px rgba(0,0,0,.45);
+}
+.message-image-viewer-zoom-hint{
+  color:rgba(255,255,255,.74);
+  font-size:11px;
+  font-weight:700;
+  text-align:center;
+  text-shadow:0 2px 7px rgba(0,0,0,.45);
+}
+#messageImageViewerZoomValue{
+  color:#fff;
+  font-weight:900;
+}
+.message-image-viewer-loading{
+  position:absolute;
+  left:50%;
+  bottom:16px;
+  transform:translateX(-50%);
+  padding:7px 11px;
+  border-radius:999px;
+  background:rgba(16,35,27,.82);
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  box-shadow:0 5px 18px rgba(0,0,0,.25);
+  pointer-events:none;
+}
+@media(max-width:720px){
+  .message-image-viewer-card{
+    padding:50px 8px 14px;
+  }
+  .message-image-viewer-image{
+    max-width:calc(100vw - 16px);
+    max-height:calc(100dvh - 105px);
+  }
+  .message-image-viewer-zoom-hint{
+    font-size:10px;
+  }
+}
