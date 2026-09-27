@@ -95,6 +95,8 @@ const state = {
   avatarPendingDataUrl: '',
   avatarCrop: null,
   avatarViewerZoom: 1,
+  messageImageViewerZoom: 1,
+  messageImageViewerObjectUrl: '',
   preferencesManager: null,
   messageService: null,
   conversationPrefs: {},
@@ -407,6 +409,122 @@ function closeAvatarViewer() {
   applyAvatarViewerZoom(1);
   $('#avatarViewerImage').removeAttribute('src');
   $('#avatarViewerName').textContent = '';
+}
+
+function revokeMessageImageViewerObjectUrl() {
+  if (!state.messageImageViewerObjectUrl) return;
+  try { URL.revokeObjectURL(state.messageImageViewerObjectUrl); } catch {}
+  state.messageImageViewerObjectUrl = '';
+}
+
+function applyMessageImageViewerZoom(nextZoom) {
+  const image = $('#messageImageViewerImage');
+  const value = $('#messageImageViewerZoomValue');
+  if (!image) return;
+  const zoom = Math.max(0.25, Math.min(8, Number(nextZoom) || 1));
+  state.messageImageViewerZoom = zoom;
+  image.style.transform = `scale(${zoom})`;
+  image.style.cursor = zoom > 1 ? 'zoom-out' : 'zoom-in';
+  if (value) value.textContent = `${Math.round(zoom * 100)}%`;
+}
+
+function messageById(messageId) {
+  return state.messages.find((message) => message.id === messageId)
+    || state.myDocumentMessages?.find?.((message) => message.id === messageId)
+    || null;
+}
+
+async function fullImageFileForMessage(message) {
+  if (!message?.decoded || message.decoded.type !== 'image') return null;
+
+  if (message.localDocument && state.documentsManager && message.decoded.fileName) {
+    try {
+      return await state.documentsManager.getFile(message.decoded.fileName);
+    } catch (error) {
+      console.warn('Kalo local image viewer could not read My Documents file', error);
+    }
+  }
+
+  const transferId = message.decoded.transferId;
+  const outgoing = transferId ? state.fileManager?.outgoingFiles?.get?.(transferId) : null;
+  if (outgoing instanceof File || outgoing instanceof Blob) return outgoing;
+
+  if (message.decoded.relay) {
+    try {
+      return await downloadEncryptedRelay(supabase, message.decoded.relay, {
+        name: message.decoded.name,
+        mime: message.decoded.mime,
+      });
+    } catch (error) {
+      console.warn('Kalo image viewer could not fetch encrypted relay', error);
+    }
+  }
+
+  return null;
+}
+
+async function openMessageImageViewer(messageId) {
+  const message = messageById(messageId);
+  if (!message || message.decoded?.type !== 'image') return;
+
+  const modal = $('#messageImageViewerModal');
+  const image = $('#messageImageViewerImage');
+  const loading = $('#messageImageViewerLoading');
+  const name = $('#messageImageViewerName');
+  if (!modal || !image) return;
+
+  revokeMessageImageViewerObjectUrl();
+  applyMessageImageViewerZoom(1);
+
+  const label = message.decoded.name || message.decoded.fileName || 'Ảnh';
+  const thumbnail = typeof message.decoded.thumbnail === 'string'
+    && message.decoded.thumbnail.startsWith('data:image/')
+    ? message.decoded.thumbnail
+    : '';
+
+  name.textContent = label;
+  image.alt = label;
+  if (thumbnail) image.src = thumbnail;
+  else image.removeAttribute('src');
+  loading?.classList.toggle('hidden', false);
+  show(modal);
+
+  try {
+    const file = await fullImageFileForMessage(message);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      if (modal.classList.contains('hidden')) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      revokeMessageImageViewerObjectUrl();
+      state.messageImageViewerObjectUrl = url;
+      image.src = url;
+      name.textContent = `${label} · ảnh gốc`;
+    } else if (thumbnail) {
+      name.textContent = `${label} · bản xem trước`;
+    } else {
+      throw new Error('Ảnh gốc hiện không còn trên thiết bị hoặc relay.');
+    }
+  } catch (error) {
+    if (!thumbnail) {
+      closeMessageImageViewer();
+      toast(error.message || 'Không mở được ảnh.', 'error');
+      return;
+    }
+    name.textContent = `${label} · bản xem trước`;
+  } finally {
+    loading?.classList.add('hidden');
+  }
+}
+
+function closeMessageImageViewer() {
+  hide('#messageImageViewerModal');
+  applyMessageImageViewerZoom(1);
+  $('#messageImageViewerImage')?.removeAttribute('src');
+  if ($('#messageImageViewerName')) $('#messageImageViewerName').textContent = '';
+  $('#messageImageViewerLoading')?.classList.add('hidden');
+  revokeMessageImageViewerObjectUrl();
 }
 
 function markAvatarClickable(element, userId) {
@@ -2019,8 +2137,8 @@ function renderMessages() {
       const canReceive = !local && !own;
       const hasRelay = Boolean(m.decoded.relay);
       const preview = typeof m.decoded.thumbnail === 'string' && m.decoded.thumbnail.startsWith('data:image/')
-        ? `<img class="image-preview" src="${escapeHtml(m.decoded.thumbnail)}" alt="${escapeHtml(m.decoded.name || 'Ảnh')}" />`
-        : '<div class="image-preview-placeholder">🖼</div>';
+        ? `<img class="image-preview" data-message-image="${m.id}" role="button" tabindex="0" title="Bấm để xem toàn màn hình" src="${escapeHtml(m.decoded.thumbnail)}" alt="${escapeHtml(m.decoded.name || 'Ảnh')}" />`
+        : `<div class="image-preview-placeholder" data-message-image="${m.id}" role="button" tabindex="0" title="Bấm để xem ảnh">🖼</div>`;
       body = `<div class="file-card image-card">
         ${preview}
         <div class="file-card-head image-meta">
@@ -3666,6 +3784,45 @@ function bindAppEvents() {
     applyAvatarViewerZoom(1);
   });
 
+  document.addEventListener('click', (event) => {
+    const target = event.target.closest?.('[data-message-image]');
+    if (!target) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openMessageImageViewer(target.dataset.messageImage).catch((error) => {
+      console.error(error);
+      toast(error.message || 'Không mở được ảnh.', 'error');
+    });
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (!['Enter', ' '].includes(event.key)) return;
+    const target = event.target.closest?.('[data-message-image]');
+    if (!target) return;
+    event.preventDefault();
+    openMessageImageViewer(target.dataset.messageImage).catch((error) => {
+      console.error(error);
+      toast(error.message || 'Không mở được ảnh.', 'error');
+    });
+  });
+
+  $('#closeMessageImageViewerBtn').addEventListener('click', closeMessageImageViewer);
+  $('#messageImageViewerModal').addEventListener('click', (event) => {
+    if (event.target === $('#messageImageViewerModal') || event.target === $('#messageImageViewerStage')) {
+      closeMessageImageViewer();
+    }
+  });
+  $('#messageImageViewerModal').addEventListener('wheel', (event) => {
+    if ($('#messageImageViewerModal').classList.contains('hidden')) return;
+    event.preventDefault();
+    const step = event.deltaY < 0 ? 0.15 : -0.15;
+    applyMessageImageViewerZoom(state.messageImageViewerZoom + step);
+  }, { passive: false });
+  $('#messageImageViewerImage').addEventListener('dblclick', (event) => {
+    event.preventDefault();
+    applyMessageImageViewerZoom(1);
+  });
+
   $('#settingsBtn').addEventListener('click', () => {
     $('#settingsAccount').textContent = `@${state.profile?.username || ''}`;
     $('#displayNameInput').value = state.profile?.display_name || '';
@@ -3966,6 +4123,11 @@ function bindAppEvents() {
     }
     if (event.key === 'Escape') {
       if (!$('#callModal').classList.contains('hidden')) return;
+      if (!$('#messageImageViewerModal').classList.contains('hidden')) {
+        event.preventDefault();
+        closeMessageImageViewer();
+        return;
+      }
       if (!$('#avatarViewerModal').classList.contains('hidden')) {
         event.preventDefault();
         closeAvatarViewer();
@@ -4013,6 +4175,7 @@ function bindAppEvents() {
     try { state.callManager?.stop(); } catch {}
     try { state.qrScanner?.stop(); } catch {}
     try { state.avatarCrop?.bitmap?.close?.(); } catch {}
+    revokeMessageImageViewerObjectUrl();
   });
 }
 
