@@ -122,6 +122,9 @@ if (!app.includes("sendMyDocumentText(")) throw new Error('My Documents self-cha
 if (!app.includes("sendMyDocumentFile(")) throw new Error('My Documents self-chat file flow is missing');
 if (!app.includes("fetchConversationMessagesForSearch(")) throw new Error('Message search flow is missing');
 if (!app.includes("addEventListener('paste'")) throw new Error('Paste-to-chat binding is missing');
+if (!app.includes("handleMessagePaste(")) throw new Error('Robust paste handler is missing');
+if (!app.includes("clipboardApiImageFiles(")) throw new Error('Clipboard image fallback is missing');
+if (!app.includes("normalizeClipboardFile(")) throw new Error('Clipboard file naming is missing');
 if (!app.includes("loadConversationCategories(")) throw new Error('Conversation category storage is missing');
 if (!app.includes("openConversationCategoryMenu(")) throw new Error('Conversation category assignment UI is missing');
 if (!app.includes("renderCategoryFilterMenu(")) throw new Error('Conversation category filter UI is missing');
