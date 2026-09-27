@@ -2709,6 +2709,133 @@ async function sendFile(file) {
   }
 }
 
+function clipboardExtension(mime = '') {
+  const normalized = String(mime || '').toLowerCase();
+  if (normalized === 'image/jpeg') return 'jpg';
+  if (normalized === 'image/gif') return 'gif';
+  if (normalized === 'image/webp') return 'webp';
+  if (normalized === 'image/svg+xml') return 'svg';
+  if (normalized === 'image/bmp') return 'bmp';
+  return 'png';
+}
+
+function normalizeClipboardFile(blob, index = 0) {
+  if (!blob) return null;
+  const type = blob.type || 'application/octet-stream';
+  const currentName = blob instanceof File ? String(blob.name || '').trim() : '';
+  if (currentName) return blob;
+  const isImage = type.startsWith('image/');
+  const extension = isImage ? clipboardExtension(type) : 'bin';
+  return new File(
+    [blob],
+    `Kalo-dan-${new Date().toISOString().replace(/[:.]/g, '-')}-${index + 1}.${extension}`,
+    { type, lastModified: Date.now() },
+  );
+}
+
+async function clipboardHtmlFiles(html = '', startIndex = 0) {
+  if (!html || !/<img\b/i.test(html)) return [];
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const sources = [...doc.querySelectorAll('img[src]')]
+    .map((img) => img.getAttribute('src'))
+    .filter((src) => /^(?:data:image\/|blob:|https?:\/\/)/i.test(String(src || '')));
+  const files = [];
+  for (const src of sources.slice(0, 8)) {
+    try {
+      const response = await fetch(src, { credentials: 'omit' });
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      if (!blob.type?.startsWith('image/')) continue;
+      files.push(normalizeClipboardFile(blob, startIndex + files.length));
+    } catch {
+      // Nhiều website chặn tải ảnh chéo miền. Khi đó Clipboard API phía dưới
+      // vẫn có thể cung cấp blob ảnh thật nếu trình duyệt cho phép.
+    }
+  }
+  return files.filter(Boolean);
+}
+
+async function clipboardApiImageFiles(startIndex = 0) {
+  if (!navigator.clipboard?.read) return [];
+  try {
+    const entries = await navigator.clipboard.read();
+    const files = [];
+    for (const entry of entries) {
+      const imageTypes = (entry.types || []).filter((type) => String(type).startsWith('image/'));
+      for (const type of imageTypes) {
+        const blob = await entry.getType(type);
+        files.push(normalizeClipboardFile(blob, startIndex + files.length));
+      }
+    }
+    return files.filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function dedupeClipboardFiles(files = []) {
+  const seen = new Set();
+  return files.filter((file) => {
+    if (!file) return false;
+    const key = [file.name || '', file.type || '', file.size || 0, file.lastModified || 0].join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function collectClipboardFiles(event) {
+  const data = event.clipboardData;
+  const files = [];
+  for (const file of [...(data?.files || [])]) {
+    files.push(normalizeClipboardFile(file, files.length));
+  }
+  for (const item of [...(data?.items || [])]) {
+    if (item.kind !== 'file') continue;
+    const file = item.getAsFile?.();
+    if (file) files.push(normalizeClipboardFile(file, files.length));
+  }
+
+  const html = data?.getData?.('text/html') || '';
+  if (!files.some((file) => file?.type?.startsWith('image/')) && /<img\b/i.test(html)) {
+    files.push(...await clipboardHtmlFiles(html, files.length));
+  }
+
+  const hasImageSignal = [...(data?.types || [])].some((type) =>
+    type === 'Files' || String(type).startsWith('image/')
+  ) || /<img\b/i.test(html);
+  if (!files.some((file) => file?.type?.startsWith('image/')) && hasImageSignal) {
+    files.push(...await clipboardApiImageFiles(files.length));
+  }
+  return dedupeClipboardFiles(files);
+}
+
+async function handleMessagePaste(event) {
+  const data = event.clipboardData;
+  const html = data?.getData?.('text/html') || '';
+  const hasFileSignal = (data?.files?.length || 0) > 0
+    || [...(data?.items || [])].some((item) => item.kind === 'file')
+    || [...(data?.types || [])].some((type) => type === 'Files' || String(type).startsWith('image/'));
+  const hasImageHtml = /<img\b/i.test(html);
+  if (!hasFileSignal && !hasImageHtml) return;
+
+  // preventDefault phải gọi đồng bộ trong sự kiện paste; nếu chờ đọc blob trước
+  // thì trình duyệt đã dán text/HTML vào textarea mất rồi.
+  event.preventDefault();
+  const files = await collectClipboardFiles(event);
+  if (!files.length) {
+    toast('Kalo nhận được dữ liệu dán nhưng không đọc được ảnh/file từ clipboard.', 'error');
+    return;
+  }
+
+  const images = files.filter((file) => file.type?.startsWith('image/'));
+  if (images.length) toast(images.length > 1 ? `Đang gửi ${images.length} ảnh đã dán…` : 'Đang gửi ảnh đã dán…');
+  for (const file of files) {
+    if (file.type?.startsWith('image/')) await sendImage(file);
+    else await sendFile(file);
+  }
+}
+
 async function sendImage(file) {
   try {
     if (state.currentView === 'documents') await sendMyDocumentFile(file, 'image');
@@ -3394,17 +3521,11 @@ function bindAppEvents() {
       renderConversationList();
     }
   });
-  $('#messageInput').addEventListener('paste', async (event) => {
-    const files = [...(event.clipboardData?.items || [])]
-      .filter((item) => item.kind === 'file')
-      .map((item) => item.getAsFile())
-      .filter(Boolean);
-    if (!files.length) return;
-    event.preventDefault();
-    for (const file of files) {
-      if (file.type?.startsWith('image/')) await sendImage(file);
-      else await sendFile(file);
-    }
+  $('#messageInput').addEventListener('paste', (event) => {
+    handleMessagePaste(event).catch((error) => {
+      console.error('Kalo paste image failed', error);
+      toast(error.message || 'Không dán được ảnh từ clipboard.', 'error');
+    });
   });
 
   let messageSearchTimer = null;
