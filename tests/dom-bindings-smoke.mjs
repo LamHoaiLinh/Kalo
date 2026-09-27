@@ -90,6 +90,13 @@ const requiredIds = [
   'avatarViewerName',
   'closeAvatarViewerBtn',
   'avatarViewerZoomValue',
+  'messageImageViewerModal',
+  'messageImageViewerStage',
+  'messageImageViewerImage',
+  'messageImageViewerLoading',
+  'messageImageViewerName',
+  'messageImageViewerZoomValue',
+  'closeMessageImageViewerBtn',
   'pinnedMessagesBtn',
   'replyComposerBar',
   'replyComposerText',
@@ -146,6 +153,11 @@ if (!app.includes("function applyAvatarViewerZoom(")) throw new Error('Avatar wh
 if (!app.includes("addEventListener('wheel'")) throw new Error('Avatar wheel listener is missing');
 if (!app.includes("closeAvatarViewer();")) throw new Error('Avatar viewer close flow is missing');
 if (!app.includes("data-avatar-user")) throw new Error('Clickable friend avatar bindings are missing');
+if (!app.includes("function openMessageImageViewer(")) throw new Error('Full chat image viewer opener is missing');
+if (!app.includes("function applyMessageImageViewerZoom(")) throw new Error('Chat image wheel zoom flow is missing');
+if (!app.includes("data-message-image")) throw new Error('Clickable chat image binding is missing');
+if (!app.includes("fullImageFileForMessage(")) throw new Error('Original chat image resolver is missing');
+if (!css.includes("Full-screen viewer for chat images")) throw new Error('Full chat image viewer styling is missing');
 if (!css.includes("Full avatar viewer")) throw new Error('Full avatar viewer styling is missing');
 if (!css.includes("#avatarCropModal")) throw new Error('Avatar crop priority styling is missing');
 if (!app.includes("contactAliasStorageKey(")) throw new Error('Private contact nickname storage is missing');
