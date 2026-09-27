@@ -1,0 +1,17 @@
+{
+  "name": "Kalo",
+  "short_name": "Kalo",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#eff8f3",
+  "theme_color": "#73c39a",
+  "lang": "vi-VN",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
