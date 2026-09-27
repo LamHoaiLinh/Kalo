@@ -1,9 +1,9 @@
-const CACHE='kalo-native-v21-full-image-viewer';
+const CACHE='kalo-native-v22-original-image-click';
 const APP_SHELL=[
   './',
   './index.html',
-  './styles.css?v=1.7.2',
-  './app.js?v=1.7.2',
+  './styles.css?v=1.7.3',
+  './app.js?v=1.7.3',
   './config.js',
   './crypto.js',
   './webrtc.js',
