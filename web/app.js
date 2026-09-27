@@ -434,6 +434,20 @@ function messageById(messageId) {
     || null;
 }
 
+function downloadFileToDevice(file, suggestedName = 'Kalo-image') {
+  if (!(file instanceof Blob)) return false;
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = String(suggestedName || file.name || 'Kalo-image').trim() || 'Kalo-image';
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  return true;
+}
+
 async function fullImageFileForMessage(message) {
   if (!message?.decoded || message.decoded.type !== 'image') return null;
 
@@ -477,47 +491,48 @@ async function openMessageImageViewer(messageId) {
   applyMessageImageViewerZoom(1);
 
   const label = message.decoded.name || message.decoded.fileName || 'Ảnh';
-  const thumbnail = typeof message.decoded.thumbnail === 'string'
-    && message.decoded.thumbnail.startsWith('data:image/')
-    ? message.decoded.thumbnail
-    : '';
-
   name.textContent = label;
   image.alt = label;
-  if (thumbnail) image.src = thumbnail;
-  else image.removeAttribute('src');
-  loading?.classList.toggle('hidden', false);
+  image.removeAttribute('src');
+  if (loading) loading.textContent = 'Đang tải ảnh gốc…';
+  loading?.classList.remove('hidden');
   show(modal);
 
   try {
     const file = await fullImageFileForMessage(message);
-    if (file) {
-      const url = URL.createObjectURL(file);
-      if (modal.classList.contains('hidden')) {
-        URL.revokeObjectURL(url);
+    if (!file) {
+      closeMessageImageViewer();
+      if (message.decoded.transferId && message.sender_id !== state.user?.id) {
+        toast('Ảnh này không còn bản relay. Kalo đang yêu cầu người gửi truyền ảnh gốc trực tiếp…');
+        await receiveFile(messageId);
         return;
       }
-      revokeMessageImageViewerObjectUrl();
-      state.messageImageViewerObjectUrl = url;
-      image.src = url;
-      name.textContent = `${label} · ảnh gốc`;
-    } else if (thumbnail) {
-      name.textContent = `${label} · bản xem trước`;
-    } else {
-      throw new Error('Ảnh gốc hiện không còn trên thiết bị hoặc relay.');
+      throw new Error('Ảnh gốc hiện không còn khả dụng.');
     }
-  } catch (error) {
-    if (!thumbnail) {
-      closeMessageImageViewer();
-      toast(error.message || 'Không mở được ảnh.', 'error');
+
+    const url = URL.createObjectURL(file);
+    if (modal.classList.contains('hidden')) {
+      URL.revokeObjectURL(url);
       return;
     }
-    name.textContent = `${label} · bản xem trước`;
+    revokeMessageImageViewerObjectUrl();
+    state.messageImageViewerObjectUrl = url;
+    image.src = url;
+    name.textContent = `${label} · ảnh gốc ${formatBytes(file.size)}`;
+
+    // Với ảnh nhận được, thao tác nhấp chính là yêu cầu lấy bản gốc:
+    // vừa mở full-resolution trong Kalo, vừa tải một bản thật về máy.
+    if (message.sender_id !== state.user?.id && !message.localDocument) {
+      downloadFileToDevice(file, label);
+      toast('Đã mở ảnh gốc và tải một bản về máy.');
+    }
+  } catch (error) {
+    closeMessageImageViewer();
+    toast(error.message || 'Không mở được ảnh gốc.', 'error');
   } finally {
     loading?.classList.add('hidden');
   }
 }
-
 function closeMessageImageViewer() {
   hide('#messageImageViewerModal');
   applyMessageImageViewerZoom(1);
@@ -2137,8 +2152,8 @@ function renderMessages() {
       const canReceive = !local && !own;
       const hasRelay = Boolean(m.decoded.relay);
       const preview = typeof m.decoded.thumbnail === 'string' && m.decoded.thumbnail.startsWith('data:image/')
-        ? `<img class="image-preview" data-message-image="${m.id}" role="button" tabindex="0" title="Bấm để xem toàn màn hình" src="${escapeHtml(m.decoded.thumbnail)}" alt="${escapeHtml(m.decoded.name || 'Ảnh')}" />`
-        : `<div class="image-preview-placeholder" data-message-image="${m.id}" role="button" tabindex="0" title="Bấm để xem ảnh">🖼</div>`;
+        ? `<img class="image-preview" data-message-image="${m.id}" role="button" tabindex="0" title="Bấm để tải và xem ảnh gốc" src="${escapeHtml(m.decoded.thumbnail)}" alt="${escapeHtml(m.decoded.name || 'Ảnh')}" />`
+        : `<div class="image-preview-placeholder" data-message-image="${m.id}" role="button" tabindex="0" title="Bấm để tải và xem ảnh gốc">🖼</div>`;
       body = `<div class="file-card image-card">
         ${preview}
         <div class="file-card-head image-meta">
