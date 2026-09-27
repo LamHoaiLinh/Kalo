@@ -157,6 +157,9 @@ if (!app.includes("function openMessageImageViewer(")) throw new Error('Full cha
 if (!app.includes("function applyMessageImageViewerZoom(")) throw new Error('Chat image wheel zoom flow is missing');
 if (!app.includes("data-message-image")) throw new Error('Clickable chat image binding is missing');
 if (!app.includes("fullImageFileForMessage(")) throw new Error('Original chat image resolver is missing');
+if (!app.includes("function downloadFileToDevice(")) throw new Error('Original chat image download helper is missing');
+if (!app.includes("Đã mở ảnh gốc và tải một bản về máy.")) throw new Error('Click-to-download original image flow is missing');
+if (app.includes("· bản xem trước")) throw new Error('Full image viewer still falls back to blurry preview');
 if (!css.includes("Full-screen viewer for chat images")) throw new Error('Full chat image viewer styling is missing');
 if (!css.includes("Full avatar viewer")) throw new Error('Full avatar viewer styling is missing');
 if (!css.includes("#avatarCropModal")) throw new Error('Avatar crop priority styling is missing');
